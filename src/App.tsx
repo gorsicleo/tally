@@ -7,7 +7,8 @@ import {
   getBackupReminderBody,
 } from './backup/backup-reminder-service'
 import { formatMonthLabel } from './domain/formatters'
-import { getMonthKey, getSyncSummary } from './domain/selectors'
+import { getNextRecurringDate } from './domain/recurring'
+import { getMonthKey } from './domain/selectors'
 import {
   BackupReminderCard,
   PrivacyFirstModal,
@@ -19,12 +20,17 @@ import { useInstallPrompt } from './pwa/register-service-worker'
 import { AppHeader } from './features/shell/app-header'
 import { TabBar, type AppTab } from './features/shell/tab-bar'
 import { SettingsScreen } from './features/settings/settings-screen'
+import { RecurringEditorSheet } from './features/recurring/recurring-editor-sheet'
 import { TransactionEditorSheet } from './features/transactions/transaction-editor-sheet'
 import { TransactionsScreen } from './features/transactions/transactions-screen'
 import { FinanceProvider } from './state/finance-context'
 import { useFinance } from './state/use-finance'
 import type { BackupPreferences, Transaction } from './domain/models'
-import type { AddTransactionInput, UpdateTransactionInput } from './state/finance-store'
+import type {
+  AddTransactionInput,
+  TransactionRecurrenceInput,
+  UpdateTransactionInput,
+} from './state/finance-store'
 
 const tabMeta: Record<AppTab, { title: string; subtitle: string }> = {
   home: {
@@ -45,7 +51,7 @@ const tabMeta: Record<AppTab, { title: string; subtitle: string }> = {
   },
   settings: {
     title: 'App settings',
-    subtitle: 'Manage sync, categories, theme, currency, and more.',
+    subtitle: 'Manage categories, theme, backups, and preferences.',
   },
 }
 
@@ -53,22 +59,22 @@ function FinanceWorkspace() {
   const {
     state,
     isLoaded,
-    isOnline,
-    isSyncing,
     addTransaction,
+    addRecurringTemplate,
     updateTransaction,
     deleteTransaction,
+    stopRecurringTemplate,
     updateBackupSettings,
   } = useFinance()
   const { canInstall, install, isInstalled } = useInstallPrompt()
   const [activeTab, setActiveTab] = useState<AppTab>('home')
   const [editorTransactionId, setEditorTransactionId] = useState<string | null>(null)
+  const [recurringEditorId, setRecurringEditorId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null)
   const [isBackupReminderVisible, setIsBackupReminderVisible] = useState(false)
   const toastTimeoutRef = useRef<number | null>(null)
   const reminderTimeoutRef = useRef<number | null>(null)
   const hasShownBackupReminderInSession = useRef(false)
-  const syncSummary = useMemo(() => getSyncSummary(state), [state])
   const currentMonthLabel = useMemo(() => formatMonthLabel(getMonthKey()), [])
   const backupReminderDecision = useMemo(
     () => evaluateBackupReminder(state),
@@ -79,18 +85,6 @@ function FinanceWorkspace() {
     [state.settings.lastBackupAt],
   )
 
-  const syncLabel = isSyncing
-    ? 'Syncing'
-    : !isOnline
-      ? syncSummary.pending > 0
-        ? `${syncSummary.pending} queued offline`
-        : 'Offline'
-      : syncSummary.failed > 0
-        ? `${syncSummary.failed} failed`
-        : syncSummary.pending > 0
-          ? `${syncSummary.pending} pending`
-          : 'Synced'
-
   const handleTabChange = (tab: AppTab) => {
     setActiveTab(tab)
   }
@@ -99,15 +93,18 @@ function FinanceWorkspace() {
     activeTab === 'insights' || activeTab === 'budgets'
       ? { title: tabMeta[activeTab].title, subtitle: currentMonthLabel }
       : activeTab === 'settings'
-        ? { title: 'Settings', subtitle: 'General, data, sync, and advanced options' }
-      : tabMeta[activeTab]
-  const headerStatusMode = activeTab === 'settings' ? 'full' : !isOnline ? 'offline-only' : 'hidden'
+        ? { title: 'Settings', subtitle: 'General, data, recurring, and categories' }
+        : tabMeta[activeTab]
+  const headerStatusMode = 'hidden'
   const headerVariant =
     activeTab === 'insights' || activeTab === 'budgets' || activeTab === 'settings'
       ? 'compact'
       : 'default'
   const editingTransaction = editorTransactionId
     ? state.transactions.find((transaction) => transaction.id === editorTransactionId) ?? null
+    : null
+  const editingRecurringTemplate = recurringEditorId
+    ? state.recurringTemplates.find((template) => template.id === recurringEditorId) ?? null
     : null
 
   useEffect(() => {
@@ -166,16 +163,6 @@ function FinanceWorkspace() {
     [updateBackupSettings],
   )
 
-  const handleCreateFirstBackup = useCallback(
-    async (remindersEnabled: boolean) => {
-      await createBackup({
-        hasSeenPrivacyModal: true,
-        backupRemindersEnabled: remindersEnabled,
-      })
-    },
-    [createBackup],
-  )
-
   useEffect(() => {
     if (reminderTimeoutRef.current !== null) {
       window.clearTimeout(reminderTimeoutRef.current)
@@ -217,9 +204,49 @@ function FinanceWorkspace() {
     updateBackupSettings,
   ])
 
-  const handleCreateTransaction = (input: AddTransactionInput) => {
-    addTransaction(input)
-    showToast('Saved')
+  const handleCreateTransaction = (
+    input: AddTransactionInput,
+    recurrence: TransactionRecurrenceInput | null,
+  ) => {
+    if (!recurrence) {
+      addTransaction(input)
+      showToast('Saved')
+      return
+    }
+
+    const firstOccurrenceIsCurrentTransaction = recurrence.startDate === input.occurredAt
+    const recurringTemplateId = addRecurringTemplate({
+      type: input.type,
+      amount: input.amount,
+      categoryId: input.categoryId,
+      note: input.note,
+      frequency: recurrence.frequency,
+      intervalDays: recurrence.intervalDays,
+      startDate: recurrence.startDate,
+      nextDueDate: firstOccurrenceIsCurrentTransaction
+        ? getNextRecurringDate(
+            {
+              frequency: recurrence.frequency,
+              intervalDays: recurrence.intervalDays,
+              startDate: recurrence.startDate,
+            },
+            recurrence.startDate,
+          )
+        : recurrence.startDate,
+    })
+
+    addTransaction({
+      ...input,
+      recurringTemplateId:
+        firstOccurrenceIsCurrentTransaction && recurringTemplateId
+          ? recurringTemplateId
+          : null,
+      recurringOccurrenceDate:
+        firstOccurrenceIsCurrentTransaction && recurringTemplateId
+          ? recurrence.startDate
+          : null,
+    })
+    showToast(recurringTemplateId ? 'Saved with recurring' : 'Saved')
   }
 
   const handleUpdateTransaction = (input: UpdateTransactionInput) => {
@@ -233,15 +260,26 @@ function FinanceWorkspace() {
   }
 
   const openQuickAdd = () => {
+    setRecurringEditorId(null)
     setEditorTransactionId('create')
   }
 
   const openTransactionEditor = (transaction: Transaction) => {
+    setRecurringEditorId(null)
     setEditorTransactionId(transaction.id)
+  }
+
+  const openRecurringEditor = (templateId: string) => {
+    setEditorTransactionId(null)
+    setRecurringEditorId(templateId)
   }
 
   const closeEditor = () => {
     setEditorTransactionId(null)
+  }
+
+  const closeRecurringEditor = () => {
+    setRecurringEditorId(null)
   }
 
   const showPrivacyModal = isLoaded && !state.settings.hasSeenPrivacyModal
@@ -257,6 +295,8 @@ function FinanceWorkspace() {
     <HomeScreen
       onNavigate={handleTabChange}
       onEditTransaction={openTransactionEditor}
+      onEditRecurring={openRecurringEditor}
+      onShowToast={showToast}
     />
   )
 
@@ -281,6 +321,7 @@ function FinanceWorkspace() {
         onInstall={() => {
           void install()
         }}
+        onOpenRecurringEditor={openRecurringEditor}
         onShowToast={showToast}
       />
     )
@@ -295,9 +336,9 @@ function FinanceWorkspace() {
         key={activeTab}
         title={activeMeta.title}
         subtitle={activeMeta.subtitle}
-        syncLabel={syncLabel}
-        isOnline={isOnline}
-        isSyncing={isSyncing}
+        syncLabel=""
+        isOnline={true}
+        isSyncing={false}
         statusMode={headerStatusMode}
         variant={headerVariant}
       />
@@ -321,7 +362,7 @@ function FinanceWorkspace() {
           <section className="panel loading-panel">
             <p className="eyebrow">LOADING</p>
             <h2>Opening your offline ledger...</h2>
-            <p>IndexedDB data and sync metadata are being restored.</p>
+            <p>IndexedDB data and your saved preferences are being restored.</p>
           </section>
         )}
       </main>
@@ -341,10 +382,31 @@ function FinanceWorkspace() {
           mode={editorTransactionId === 'create' ? 'create' : 'edit'}
           categories={state.categories}
           initialTransaction={editingTransaction}
+          recurringTemplate={
+            editingTransaction?.recurringTemplateId
+              ? state.recurringTemplates.find(
+                  (template) => template.id === editingTransaction.recurringTemplateId,
+                ) ?? null
+              : null
+          }
           onClose={closeEditor}
           onCreate={handleCreateTransaction}
           onUpdate={handleUpdateTransaction}
           onDelete={handleDeleteTransaction}
+          onEditFutureRecurring={openRecurringEditor}
+          onStopRecurring={(templateId) => {
+            stopRecurringTemplate(templateId)
+            showToast('Recurring stopped.')
+          }}
+        />
+      ) : null}
+
+      {editingRecurringTemplate ? (
+        <RecurringEditorSheet
+          key={editingRecurringTemplate.id}
+          templateId={editingRecurringTemplate.id}
+          onClose={closeRecurringEditor}
+          onShowToast={showToast}
         />
       ) : null}
 
@@ -358,7 +420,6 @@ function FinanceWorkspace() {
         <PrivacyFirstModal
           initialRemindersEnabled={state.settings.backupRemindersEnabled}
           onContinue={handleContinuePrivacyModal}
-          onCreateBackup={handleCreateFirstBackup}
         />
       ) : null}
 

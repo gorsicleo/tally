@@ -16,7 +16,7 @@ function createReminderState(): FinanceState {
         name: 'Side hustle',
         color: '#54d9a6',
         kind: 'income',
-        isDefault: false,
+        system: null,
         createdAt: '2026-03-01T08:00:00.000Z',
         updatedAt: '2026-03-01T08:00:00.000Z',
         syncStatus: 'synced',
@@ -30,11 +30,14 @@ function createReminderState(): FinanceState {
         categoryId: 'cat-food',
         note: 'Groceries',
         occurredAt: '2026-03-15',
+        recurringTemplateId: null,
+        recurringOccurrenceDate: null,
         createdAt: '2026-03-15T12:00:00.000Z',
         updatedAt: '2026-03-15T12:00:00.000Z',
         syncStatus: 'synced',
       },
     ],
+    recurringTemplates: [],
     settings: {
       ...initialFinanceState.settings,
       hasSeenPrivacyModal: true,
@@ -110,5 +113,37 @@ describe('evaluateBackupReminder', () => {
         new Date('2026-03-19T10:00:00.000Z'),
       ),
     ).toBe('Your last backup was 2 days ago.')
+  })
+
+  it('treats recurring templates as meaningful local data', () => {
+    const result = evaluateBackupReminder(
+      {
+        ...initialFinanceState,
+        recurringTemplates: [
+          {
+            id: 'rec-gym',
+            type: 'expense',
+            amount: 35,
+            categoryId: 'cat-fun',
+            note: 'Gym',
+            frequency: 'monthly',
+            intervalDays: null,
+            startDate: '2026-03-01',
+            nextDueDate: '2026-04-01',
+            active: true,
+            createdAt: '2026-03-01T08:00:00.000Z',
+            updatedAt: '2026-03-01T08:00:00.000Z',
+            syncStatus: 'synced',
+          },
+        ],
+        settings: {
+          ...initialFinanceState.settings,
+          backupRemindersEnabled: true,
+        },
+      },
+      new Date('2026-03-19T10:00:00.000Z'),
+    )
+
+    expect(result).toEqual({ shouldShow: true, reason: 'missing-backup' })
   })
 })

@@ -16,7 +16,7 @@ function createSampleState(): FinanceState {
         name: 'Health',
         color: '#7bc4ff',
         kind: 'expense',
-        isDefault: false,
+        system: null,
         createdAt: '2026-03-10T10:00:00.000Z',
         updatedAt: '2026-03-10T10:00:00.000Z',
         syncStatus: 'synced',
@@ -30,6 +30,8 @@ function createSampleState(): FinanceState {
         categoryId: 'cat-health',
         note: 'Pharmacy',
         occurredAt: '2026-03-11',
+        recurringTemplateId: null,
+        recurringOccurrenceDate: null,
         createdAt: '2026-03-11T08:00:00.000Z',
         updatedAt: '2026-03-11T08:00:00.000Z',
         syncStatus: 'synced',
@@ -38,9 +40,27 @@ function createSampleState(): FinanceState {
     budgets: [
       {
         id: 'budget-cat-health-2026-03',
-        categoryId: 'cat-health',
+        name: 'Health plan',
+        categoryIds: ['cat-health'],
         monthKey: '2026-03',
         limit: 120,
+        createdAt: '2026-03-01T09:00:00.000Z',
+        updatedAt: '2026-03-01T09:00:00.000Z',
+        syncStatus: 'synced',
+      },
+    ],
+    recurringTemplates: [
+      {
+        id: 'rec-rent',
+        type: 'expense',
+        amount: 900,
+        categoryId: 'cat-housing',
+        note: 'Rent',
+        frequency: 'monthly',
+        intervalDays: null,
+        startDate: '2026-03-01',
+        nextDueDate: '2026-04-01',
+        active: true,
         createdAt: '2026-03-01T09:00:00.000Z',
         updatedAt: '2026-03-01T09:00:00.000Z',
         syncStatus: 'synced',
@@ -63,12 +83,13 @@ describe('buildBackupPayload', () => {
     const exportedAt = '2026-03-19T09:30:00.000Z'
     const payload = buildBackupPayload(createSampleState(), exportedAt)
 
-    expect(payload.schemaVersion).toBe(1)
+    expect(payload.schemaVersion).toBe(2)
     expect(payload.app).toBe('Tally')
     expect(payload.exportedAt).toBe(exportedAt)
     expect(payload.data.transactions).toHaveLength(1)
     expect(payload.data.categories).toHaveLength(initialFinanceState.categories.length + 1)
     expect(payload.data.budgets).toHaveLength(1)
+    expect(payload.data.recurringTemplates).toHaveLength(1)
     expect(payload.data.preferences.currency).toBe('EUR')
     expect(payload.data.preferences.backupRemindersEnabled).toBe(false)
     expect(payload.data.preferences.lastBackupAt).toBe(exportedAt)

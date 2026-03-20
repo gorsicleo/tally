@@ -1,20 +1,34 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { getRecurringFrequencyLabel } from '../../domain/recurring'
 import { formatCompactDateLabel } from '../../domain/formatters'
 import type {
   AddTransactionInput,
+  TransactionRecurrenceInput,
   UpdateTransactionInput,
 } from '../../state/finance-store'
-import type { Category, Transaction, TransactionType } from '../../domain/models'
+import type {
+  Category,
+  RecurringFrequency,
+  RecurringTemplate,
+  Transaction,
+  TransactionType,
+} from '../../domain/models'
 import { getTodayLocalDate } from '../../utils/date'
 
 interface TransactionEditorSheetProps {
   mode: 'create' | 'edit'
   categories: Category[]
   initialTransaction?: Transaction | null
+  recurringTemplate?: RecurringTemplate | null
   onClose: () => void
-  onCreate: (input: AddTransactionInput) => void
+  onCreate: (
+    input: AddTransactionInput,
+    recurrence: TransactionRecurrenceInput | null,
+  ) => void
   onUpdate: (input: UpdateTransactionInput) => void
   onDelete?: (transactionId: string) => void
+  onEditFutureRecurring?: (templateId: string) => void
+  onStopRecurring?: (templateId: string) => void
 }
 
 const SHEET_CLOSE_MS = 280
@@ -108,10 +122,13 @@ export function TransactionEditorSheet({
   mode,
   categories,
   initialTransaction,
+  recurringTemplate,
   onClose,
   onCreate,
   onUpdate,
   onDelete,
+  onEditFutureRecurring,
+  onStopRecurring,
 }: TransactionEditorSheetProps) {
   const [sheetDefaults, setSheetDefaults] = useState<TransactionSheetDefaults>(
     () => readTransactionSheetDefaults(),
@@ -142,6 +159,13 @@ export function TransactionEditorSheet({
     Boolean(initialTransaction?.note),
   )
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  const [showRecurringOptions, setShowRecurringOptions] = useState(false)
+  const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('monthly')
+  const [recurringIntervalDays, setRecurringIntervalDays] = useState('7')
+  const [recurringStartDate, setRecurringStartDate] = useState(
+    initialTransaction?.occurredAt ?? todayDate,
+  )
+  const [hasEditedRecurringStartDate, setHasEditedRecurringStartDate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [state, setState] = useState<'opening' | 'open' | 'closing'>('opening')
   const closingRef = useRef(false)
@@ -174,6 +198,15 @@ export function TransactionEditorSheet({
     return firstCategories
   }, [compatibleCategories, selectedCategoryId])
   const hasMoreCategories = compatibleCategories.length > MAX_QUICK_CATEGORY_CHIPS
+  const recurringSummary = showRecurringOptions
+    ? getRecurringFrequencyLabel({
+        frequency: recurringFrequency,
+        intervalDays:
+          recurringFrequency === 'custom'
+            ? Number(recurringIntervalDays)
+            : null,
+      })
+    : 'Off'
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -198,6 +231,24 @@ export function TransactionEditorSheet({
       }
     }
   }, [mode])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    const { body, documentElement } = document
+    const previousBodyOverflow = body.style.overflow
+    const previousHtmlOverflow = documentElement.style.overflow
+
+    body.style.overflow = 'hidden'
+    documentElement.style.overflow = 'hidden'
+
+    return () => {
+      body.style.overflow = previousBodyOverflow
+      documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [])
 
   const requestClose = (afterClose?: () => void) => {
     if (closingRef.current) {
@@ -272,6 +323,29 @@ export function TransactionEditorSheet({
       return
     }
 
+    let recurrence: TransactionRecurrenceInput | null = null
+
+    if (mode === 'create' && showRecurringOptions) {
+      const numericIntervalDays = Number(recurringIntervalDays)
+
+      if (
+        recurringFrequency === 'custom' &&
+        (!Number.isFinite(numericIntervalDays) || numericIntervalDays < 1)
+      ) {
+        setError('Custom repeat must be at least 1 day.')
+        return
+      }
+
+      recurrence = {
+        frequency: recurringFrequency,
+        intervalDays:
+          recurringFrequency === 'custom'
+            ? Math.floor(numericIntervalDays)
+            : null,
+        startDate: recurringStartDate,
+      }
+    }
+
     const nextDefaults: TransactionSheetDefaults = {
       lastType: type,
       lastCategoryByType: {
@@ -293,13 +367,16 @@ export function TransactionEditorSheet({
         occurredAt,
       })
     } else {
-      onCreate({
-        type,
-        amount: numericAmount,
-        categoryId: selectedCategoryId,
-        note,
-        occurredAt,
-      })
+      onCreate(
+        {
+          type,
+          amount: numericAmount,
+          categoryId: selectedCategoryId,
+          note,
+          occurredAt,
+        },
+        recurrence,
+      )
     }
 
     requestClose()
@@ -323,8 +400,6 @@ export function TransactionEditorSheet({
         aria-labelledby="transaction-sheet-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sheet-grabber" aria-hidden="true" />
-
         <div className="sheet-header compact-sheet-header">
           <div>
             <p className="eyebrow">{mode === 'edit' ? 'Edit' : 'New'}</p>
@@ -441,10 +516,142 @@ export function TransactionEditorSheet({
               <input
                 type="date"
                 value={occurredAt}
-                onChange={(event) => setOccurredAt(event.target.value)}
+                onChange={(event) => {
+                  const nextOccurredAt = event.target.value
+
+                  setOccurredAt(nextOccurredAt)
+
+                  if (!hasEditedRecurringStartDate) {
+                    setRecurringStartDate(nextOccurredAt)
+                  }
+                }}
                 required
               />
             </label>
+          ) : null}
+
+          {mode === 'create' ? (
+            <div className="sheet-recurring-section">
+              <button
+                type="button"
+                className="sheet-recurring-toggle"
+                onClick={() => {
+                  setShowRecurringOptions((current) => !current)
+                  setError(null)
+                }}
+              >
+                <span className="sheet-inline-label">Repeat</span>
+                <span className="sheet-recurring-summary">{recurringSummary}</span>
+              </button>
+
+              {showRecurringOptions ? (
+                <div className="sheet-recurring-fields">
+                  <div className="pill-switch" role="group" aria-label="Recurring frequency">
+                    <button
+                      type="button"
+                      className={recurringFrequency === 'monthly' ? 'active' : ''}
+                      onClick={() => {
+                        setRecurringFrequency('monthly')
+                        setError(null)
+                      }}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      className={recurringFrequency === 'custom' ? 'active' : ''}
+                      onClick={() => {
+                        setRecurringFrequency('custom')
+                        setError(null)
+                      }}
+                    >
+                      Custom
+                    </button>
+                  </div>
+
+                  {recurringFrequency === 'custom' ? (
+                    <label className="sheet-select-label">
+                      Repeat every how many days?
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={recurringIntervalDays}
+                        onChange={(event) => {
+                          setRecurringIntervalDays(event.target.value)
+                          setError(null)
+                        }}
+                        required
+                      />
+                    </label>
+                  ) : null}
+
+                  <label className="sheet-select-label">
+                    Start date
+                    <input
+                      type="date"
+                      min={occurredAt}
+                      value={recurringStartDate}
+                      onChange={(event) => {
+                        setRecurringStartDate(event.target.value)
+                        setHasEditedRecurringStartDate(true)
+                        setError(null)
+                      }}
+                      required
+                    />
+                  </label>
+
+                  <p className="support-copy sheet-recurring-help">
+                    Due items stay visible on Home until you confirm them.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : recurringTemplate ? (
+            <div className="sheet-recurring-origin-card">
+              <p className="sheet-recurring-origin-title">
+                This transaction is part of a recurring series.
+              </p>
+              <p className="sheet-recurring-origin-copy">
+                {recurringTemplate.active
+                  ? 'Changes here affect only this transaction. Edit the recurring source separately for future occurrences.'
+                  : 'Changes here affect only this transaction. The recurring source has already been stopped.'}
+              </p>
+
+              <div className="sheet-recurring-origin-actions">
+                {recurringTemplate.active && onEditFutureRecurring ? (
+                  <button
+                    type="button"
+                    className="ghost-button compact"
+                    onClick={() => {
+                      requestClose(() => onEditFutureRecurring(recurringTemplate.id))
+                    }}
+                  >
+                    Edit future recurring transactions
+                  </button>
+                ) : null}
+
+                {recurringTemplate.active && onStopRecurring ? (
+                  <button
+                    type="button"
+                    className="ghost-button compact danger-button"
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        'Stop recurring for future occurrences?',
+                      )
+
+                      if (!confirmed) {
+                        return
+                      }
+
+                      requestClose(() => onStopRecurring(recurringTemplate.id))
+                    }}
+                  >
+                    Stop recurring
+                  </button>
+                ) : null}
+              </div>
+            </div>
           ) : null}
 
           {showNoteInput ? (

@@ -71,9 +71,9 @@ export function TransactionList({
                       {category?.name ?? 'Unknown'}
                     </span>
                     <span>{formatDateLabel(transaction.occurredAt)}</span>
-                    <span className={`mini-pill ${transaction.syncStatus}`}>
-                      {transaction.syncStatus}
-                    </span>
+                    {transaction.recurringTemplateId ? (
+                      <span className="mini-pill neutral">Recurring</span>
+                    ) : null}
                   </div>
                 </div>
 

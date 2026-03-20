@@ -1,10 +1,14 @@
 import { createId } from '../utils/id'
+import { isSystemCategory } from '../domain/categories'
+import { validateBudgetCategoryIds } from '../domain/budget-service'
+import type { CategoryDeletionPlan } from '../domain/category-service'
 import type {
   AppSettings,
   Budget,
   Category,
   CategoryKind,
   FinanceState,
+  RecurringTemplate,
   SyncQueueItem,
   Transaction,
 } from '../domain/models'
@@ -14,10 +18,33 @@ type FinanceAction =
   | { type: 'replace-state'; payload: FinanceState }
   | { type: 'add-category'; payload: Category }
   | { type: 'update-category'; payload: Category }
-  | { type: 'delete-category'; payload: { id: string } }
+  | {
+      type: 'delete-category'
+      payload: { plan: CategoryDeletionPlan; updatedAt: string }
+    }
   | { type: 'add-transaction'; payload: Transaction }
   | { type: 'update-transaction'; payload: Transaction }
   | { type: 'delete-transaction'; payload: { id: string } }
+  | { type: 'add-recurring-template'; payload: RecurringTemplate }
+  | { type: 'update-recurring-template'; payload: RecurringTemplate }
+  | { type: 'stop-recurring-template'; payload: { id: string; updatedAt: string } }
+  | {
+      type: 'add-recurring-occurrences'
+      payload: {
+        templateId: string
+        transactions: Transaction[]
+        nextDueDate: string
+        updatedAt: string
+      }
+    }
+  | {
+      type: 'skip-recurring-occurrences'
+      payload: {
+        templateId: string
+        nextDueDate: string
+        updatedAt: string
+      }
+    }
   | { type: 'set-budget'; payload: Budget }
   | { type: 'remove-budget'; payload: { id: string } }
   | { type: 'update-settings'; payload: Partial<AppSettings> }
@@ -28,8 +55,11 @@ type FinanceAction =
       payload: { at: string; operationIds: string[]; error: string }
     }
 
-function isCategoryCompatible(category: Category, transaction: Transaction): boolean {
-  return category.kind === 'both' || category.kind === transaction.type
+function isCategoryCompatible(
+  category: Category,
+  entry: Pick<Transaction, 'type'>,
+): boolean {
+  return category.kind === 'both' || category.kind === entry.type
 }
 
 function categoryKindSupportsTransactions(
@@ -38,6 +68,15 @@ function categoryKindSupportsTransactions(
 ): boolean {
   return transactions.every(
     (transaction) => kind === 'both' || transaction.type === kind,
+  )
+}
+
+function categoryKindSupportsRecurringTemplates(
+  kind: CategoryKind,
+  recurringTemplates: RecurringTemplate[],
+): boolean {
+  return recurringTemplates.every(
+    (template) => kind === 'both' || template.type === kind,
   )
 }
 
@@ -70,13 +109,30 @@ function queueOperation(
   ]
 }
 
-function queueBudgetDeletes(
+function queueTransactionUpserts(
+  queue: SyncQueueItem[],
+  transactions: Transaction[],
+): SyncQueueItem[] {
+  return transactions.reduce(
+    (nextQueue, transaction) =>
+      queueOperation(
+        nextQueue,
+        'transaction',
+        'upsert',
+        transaction.id,
+        transaction,
+      ),
+    queue,
+  )
+}
+
+function queueBudgetUpserts(
   queue: SyncQueueItem[],
   budgets: Budget[],
 ): SyncQueueItem[] {
   return budgets.reduce(
     (nextQueue, budget) =>
-      queueOperation(nextQueue, 'budget', 'delete', budget.id, null),
+      queueOperation(nextQueue, 'budget', 'upsert', budget.id, budget),
     queue,
   )
 }
@@ -138,7 +194,7 @@ export function financeReducer(
         (category) => category.id === action.payload.id,
       )
 
-      if (!existingCategory) {
+      if (!existingCategory || isSystemCategory(existingCategory)) {
         return state
       }
 
@@ -151,11 +207,23 @@ export function financeReducer(
       const linkedTransactions = state.transactions.filter(
         (transaction) => transaction.categoryId === action.payload.id,
       )
+      const linkedRecurringTemplates = state.recurringTemplates.filter(
+        (template) =>
+          template.categoryId === action.payload.id && template.active,
+      )
+      const linkedBudgets = state.budgets.filter((budget) =>
+        budget.categoryIds.includes(action.payload.id),
+      )
 
       if (
         !normalizedName ||
         alreadyExists ||
-        !categoryKindSupportsTransactions(action.payload.kind, linkedTransactions)
+        (action.payload.kind === 'income' && linkedBudgets.length > 0) ||
+        !categoryKindSupportsTransactions(action.payload.kind, linkedTransactions) ||
+        !categoryKindSupportsRecurringTemplates(
+          action.payload.kind,
+          linkedRecurringTemplates,
+        )
       ) {
         return state
       }
@@ -176,44 +244,102 @@ export function financeReducer(
     }
 
     case 'delete-category': {
+      const { plan, updatedAt } = action.payload
       const existingCategory = state.categories.find(
-        (category) => category.id === action.payload.id,
+        (category) => category.id === plan.categoryId,
+      )
+      const replacementCategory = state.categories.find(
+        (category) => category.id === plan.replacementCategoryId,
       )
 
-      if (!existingCategory || existingCategory.isDefault) {
+      if (
+        !existingCategory ||
+        isSystemCategory(existingCategory) ||
+        !replacementCategory
+      ) {
         return state
       }
 
-      const hasTransactions = state.transactions.some(
-        (transaction) => transaction.categoryId === action.payload.id,
+      const transactionIdSet = new Set(plan.transactionIds)
+      const recurringTemplateIdSet = new Set(plan.recurringTemplateIds)
+      const budgetOutcomeById = new Map(
+        plan.budgetOutcomes.map((outcome) => [outcome.budgetId, outcome]),
       )
 
-      if (hasTransactions) {
-        return state
-      }
+      const nextTransactions = state.transactions.map((transaction) =>
+        transactionIdSet.has(transaction.id)
+          ? {
+              ...transaction,
+              categoryId: replacementCategory.id,
+              updatedAt,
+              syncStatus: 'pending' as const,
+            }
+          : transaction,
+      )
+      const reassignedTransactions = nextTransactions.filter((transaction) =>
+        transactionIdSet.has(transaction.id),
+      )
 
-      const relatedBudgets = state.budgets.filter(
-        (budget) => budget.categoryId === action.payload.id,
+      const nextRecurringTemplates = state.recurringTemplates.map((template) =>
+        recurringTemplateIdSet.has(template.id)
+          ? {
+              ...template,
+              categoryId: replacementCategory.id,
+              updatedAt,
+            }
+          : template,
+      )
+
+      const reassignedBudgets: Budget[] = []
+      const deletedBudgetIds: string[] = []
+      const nextBudgets = state.budgets.flatMap((budget) => {
+        const outcome = budgetOutcomeById.get(budget.id)
+
+        if (!outcome) {
+          return budget
+        }
+
+        if (outcome.nextCategoryIds === null) {
+          deletedBudgetIds.push(budget.id)
+          return []
+        }
+
+        const nextBudget: Budget = {
+          ...budget,
+          categoryIds: outcome.nextCategoryIds,
+          updatedAt,
+          syncStatus: 'pending',
+        }
+
+        reassignedBudgets.push(nextBudget)
+        return nextBudget
+      })
+
+      let nextSyncQueue = queueOperation(
+        state.syncQueue,
+        'category',
+        'delete',
+        existingCategory.id,
+        null,
+      )
+
+      nextSyncQueue = queueTransactionUpserts(nextSyncQueue, reassignedTransactions)
+      nextSyncQueue = queueBudgetUpserts(nextSyncQueue, reassignedBudgets)
+      nextSyncQueue = deletedBudgetIds.reduce(
+        (queue, budgetId) =>
+          queueOperation(queue, 'budget', 'delete', budgetId, null),
+        nextSyncQueue,
       )
 
       return recordMeaningfulChange({
         ...state,
+        transactions: nextTransactions,
+        recurringTemplates: nextRecurringTemplates,
         categories: state.categories.filter(
-          (category) => category.id !== action.payload.id,
+          (category) => category.id !== existingCategory.id,
         ),
-        budgets: state.budgets.filter(
-          (budget) => budget.categoryId !== action.payload.id,
-        ),
-        syncQueue: queueBudgetDeletes(
-          queueOperation(
-            state.syncQueue,
-            'category',
-            'delete',
-            action.payload.id,
-            null,
-          ),
-          relatedBudgets,
-        ),
+        budgets: nextBudgets,
+        syncQueue: nextSyncQueue,
       })
     }
 
@@ -299,22 +425,150 @@ export function financeReducer(
       })
     }
 
-    case 'set-budget': {
-      const categoryExists = state.categories.some(
-        (category) => category.id === action.payload.categoryId,
+    case 'add-recurring-template': {
+      const category = state.categories.find(
+        (entry) => entry.id === action.payload.categoryId,
       )
 
-      if (!categoryExists || action.payload.limit <= 0) {
+      if (
+        !category ||
+        !isCategoryCompatible(category, action.payload) ||
+        action.payload.amount <= 0
+      ) {
         return state
       }
 
+      return recordMeaningfulChange({
+        ...state,
+        recurringTemplates: [action.payload, ...state.recurringTemplates],
+      })
+    }
+
+    case 'update-recurring-template': {
+      const existingTemplate = state.recurringTemplates.find(
+        (template) => template.id === action.payload.id,
+      )
+      const category = state.categories.find(
+        (entry) => entry.id === action.payload.categoryId,
+      )
+
+      if (
+        !existingTemplate ||
+        !category ||
+        !isCategoryCompatible(category, action.payload) ||
+        action.payload.amount <= 0
+      ) {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        recurringTemplates: state.recurringTemplates.map((template) =>
+          template.id === action.payload.id ? action.payload : template,
+        ),
+      })
+    }
+
+    case 'stop-recurring-template': {
+      const existingTemplate = state.recurringTemplates.find(
+        (template) => template.id === action.payload.id,
+      )
+
+      if (!existingTemplate || !existingTemplate.active) {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        recurringTemplates: state.recurringTemplates.map((template) =>
+          template.id === action.payload.id
+            ? {
+                ...template,
+                active: false,
+                updatedAt: action.payload.updatedAt,
+              }
+            : template,
+        ),
+      })
+    }
+
+    case 'add-recurring-occurrences': {
+      const existingTemplate = state.recurringTemplates.find(
+        (template) => template.id === action.payload.templateId,
+      )
+
+      if (!existingTemplate || !existingTemplate.active || action.payload.transactions.length === 0) {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        transactions: [...action.payload.transactions, ...state.transactions],
+        recurringTemplates: state.recurringTemplates.map((template) =>
+          template.id === action.payload.templateId
+            ? {
+                ...template,
+                nextDueDate: action.payload.nextDueDate,
+                updatedAt: action.payload.updatedAt,
+              }
+            : template,
+        ),
+        syncQueue: queueTransactionUpserts(state.syncQueue, action.payload.transactions),
+      })
+    }
+
+    case 'skip-recurring-occurrences': {
+      const existingTemplate = state.recurringTemplates.find(
+        (template) => template.id === action.payload.templateId,
+      )
+
+      if (!existingTemplate || !existingTemplate.active) {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        recurringTemplates: state.recurringTemplates.map((template) =>
+          template.id === action.payload.templateId
+            ? {
+                ...template,
+                nextDueDate: action.payload.nextDueDate,
+                updatedAt: action.payload.updatedAt,
+              }
+            : template,
+        ),
+      })
+    }
+
+    case 'set-budget': {
+      const normalizedName = action.payload.name.trim()
+      const categoryIds = validateBudgetCategoryIds(
+        action.payload.categoryIds,
+        state.categories,
+      )
+
+      if (
+        !normalizedName ||
+        categoryIds.length === 0 ||
+        !Number.isFinite(action.payload.limit) ||
+        action.payload.limit <= 0
+      ) {
+        return state
+      }
+
+      const normalizedBudget: Budget = {
+        ...action.payload,
+        name: normalizedName,
+        categoryIds,
+      }
+
       const nextBudgets = state.budgets.some(
-        (budget) => budget.id === action.payload.id,
+        (budget) => budget.id === normalizedBudget.id,
       )
         ? state.budgets.map((budget) =>
-            budget.id === action.payload.id ? action.payload : budget,
+            budget.id === normalizedBudget.id ? normalizedBudget : budget,
           )
-        : [...state.budgets, action.payload]
+        : [...state.budgets, normalizedBudget]
 
       return recordMeaningfulChange({
         ...state,
@@ -323,8 +577,8 @@ export function financeReducer(
           state.syncQueue,
           'budget',
           'upsert',
-          action.payload.id,
-          action.payload,
+          normalizedBudget.id,
+          normalizedBudget,
         ),
       })
     }

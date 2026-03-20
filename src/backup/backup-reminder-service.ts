@@ -1,4 +1,11 @@
-import type { AppSettings, Budget, Category, Transaction } from '../domain/models'
+import type {
+  AppSettings,
+  Budget,
+  Category,
+  RecurringTemplate,
+  Transaction,
+} from '../domain/models'
+import { isSystemCategory } from '../domain/categories'
 
 const DAY_IN_MS = 86_400_000
 const HOUR_IN_MS = 3_600_000
@@ -23,13 +30,15 @@ interface BackupReminderStateLike {
   transactions: Transaction[]
   budgets: Budget[]
   categories: Category[]
+  recurringTemplates: RecurringTemplate[]
 }
 
 export function hasMeaningfulBackupData(state: BackupReminderStateLike): boolean {
   return (
     state.transactions.length > 0 ||
     state.budgets.length > 0 ||
-    state.categories.some((category) => !category.isDefault)
+    state.categories.some((category) => !isSystemCategory(category)) ||
+    state.recurringTemplates.length > 0
   )
 }
 

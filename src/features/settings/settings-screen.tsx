@@ -9,18 +9,30 @@ import {
 import type { PreparedBackupRestore } from '../../backup/backup-models'
 import { prepareBackupRestoreFile } from '../../backup/restore-service'
 import { RestoreBackupDialog } from '../backup/backup-ui'
+import type { CategoryDeletionStrategy } from '../../domain/category-service'
 import { exportTransactionsAsCsv } from '../../domain/exporters'
-import { formatDateTimeLabel } from '../../domain/formatters'
+import {
+  getRecurringFrequencyLabel,
+  getRecurringTemplateLabel,
+} from '../../domain/recurring'
+import { formatCurrency, formatDateTimeLabel, formatLongDateLabel } from '../../domain/formatters'
 import type { Category, CategoryKind } from '../../domain/models'
-import { getMonthKey, getSyncSummary } from '../../domain/selectors'
+import { getVisibleManagedCategories } from '../../domain/categories'
+import { getMonthKey } from '../../domain/selectors'
 import { useFinance } from '../../state/use-finance'
 import { downloadTextFile } from '../../utils/download'
-import { ThemeToggle } from '../shell/theme-toggle'
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'CZK']
 const CATEGORY_SHEET_CLOSE_MS = 280
 
-type SettingsView = 'main' | 'categories'
+type SettingsView = 'main' | 'categories' | 'recurring'
+
+function categorySupportsType(
+  category: Pick<Category, 'kind'>,
+  type: 'income' | 'expense',
+): boolean {
+  return category.kind === 'both' || category.kind === type
+}
 
 interface CategoryEditorInput {
   name: string
@@ -32,6 +44,14 @@ interface CategoryEditorSheetProps {
   mode: 'create' | 'edit'
   initialCategory: Category | null
   linkedCount: number
+  deletionStrategy: CategoryDeletionStrategy
+  replacementCategoryId: string | null
+  replacementCategories: Category[]
+  deletionImpactSummary: string | null
+  deletionConfirmationText: string
+  canDelete: boolean
+  onDeletionStrategyChange: (strategy: CategoryDeletionStrategy) => void
+  onReplacementCategoryChange: (categoryId: string) => void
   onClose: () => void
   onSave: (input: CategoryEditorInput) => string | null
   onDelete: () => string | null
@@ -41,6 +61,14 @@ function CategoryEditorSheet({
   mode,
   initialCategory,
   linkedCount,
+  deletionStrategy,
+  replacementCategoryId,
+  replacementCategories,
+  deletionImpactSummary,
+  deletionConfirmationText,
+  canDelete,
+  onDeletionStrategyChange,
+  onReplacementCategoryChange,
   onClose,
   onSave,
   onDelete,
@@ -95,11 +123,11 @@ function CategoryEditorSheet({
   }
 
   const handleDelete = () => {
-    if (!initialCategory) {
+    if (!initialCategory || !canDelete) {
       return
     }
 
-    const confirmed = window.confirm(`Delete category ${initialCategory.name}?`)
+    const confirmed = window.confirm(deletionConfirmationText)
 
     if (!confirmed) {
       return
@@ -192,10 +220,55 @@ function CategoryEditorSheet({
           {mode === 'edit' && initialCategory ? (
             <div className="category-sheet-meta">
               <span className="micro-badge">{initialCategory.kind}</span>
-              {initialCategory.isDefault ? (
-                <span className="micro-badge subtle">default</span>
-              ) : null}
               <span className="micro-badge subtle">{linkedCount} linked</span>
+            </div>
+          ) : null}
+
+          {mode === 'edit' && canDelete ? (
+            <div className="field-grid category-delete-options">
+              <div>
+                <p className="support-copy">When deleted, linked records are moved to:</p>
+                <div className="settings-inline-switch" role="group" aria-label="Category delete strategy">
+                  <button
+                    type="button"
+                    className={deletionStrategy === 'uncategorized' ? 'active' : ''}
+                    onClick={() => onDeletionStrategyChange('uncategorized')}
+                  >
+                    Uncategorized
+                  </button>
+                  <button
+                    type="button"
+                    className={deletionStrategy === 'reassign' ? 'active' : ''}
+                    onClick={() => onDeletionStrategyChange('reassign')}
+                    disabled={replacementCategories.length === 0}
+                  >
+                    Reassign
+                  </button>
+                </div>
+              </div>
+
+              {deletionStrategy === 'reassign' ? (
+                <label>
+                  Replacement category
+                  <select
+                    value={replacementCategoryId ?? ''}
+                    onChange={(event) => {
+                      onReplacementCategoryChange(event.target.value)
+                    }}
+                    required
+                  >
+                    {replacementCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {deletionImpactSummary ? (
+                <p className="support-copy">{deletionImpactSummary}</p>
+              ) : null}
             </div>
           ) : null}
 
@@ -206,7 +279,7 @@ function CategoryEditorSheet({
               {mode === 'edit' ? 'Save category' : 'Add category'}
             </button>
 
-            {mode === 'edit' ? (
+            {mode === 'edit' && canDelete ? (
               <button
                 type="button"
                 className="ghost-button danger-button"
@@ -227,6 +300,7 @@ interface SettingsScreenProps {
   isInstalled: boolean
   onCreateBackup: () => Promise<boolean>
   onInstall: () => void
+  onOpenRecurringEditor: (templateId: string) => void
   onShowToast: (message: string) => void
 }
 
@@ -235,47 +309,42 @@ export function SettingsScreen({
   isInstalled,
   onCreateBackup,
   onInstall,
+  onOpenRecurringEditor,
   onShowToast,
 }: SettingsScreenProps) {
   const {
     state,
-    isOnline,
-    isSyncing,
     addCategory,
     updateCategory,
+    previewCategoryDeletion,
     deleteCategory,
     setTheme,
     setCurrency,
-    setSyncEndpoint,
     updateBackupSettings,
     replaceState,
-    syncNow,
   } = useFinance()
 
   const [view, setView] = useState<SettingsView>('main')
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
   const [backupMessage, setBackupMessage] = useState<{
     tone: 'default' | 'error'
     text: string
   } | null>(null)
   const [editingCategoryId, setEditingCategoryId] = useState<string | 'create' | null>(null)
+  const [deletionStrategy, setDeletionStrategy] = useState<CategoryDeletionStrategy>('uncategorized')
+  const [replacementCategoryId, setReplacementCategoryId] = useState<string | null>(null)
   const [pendingRestore, setPendingRestore] = useState<{
     fileName: string
     prepared: PreparedBackupRestore
   } | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
-  const syncSummary = useMemo(() => getSyncSummary(state), [state])
 
-  const sortedCategories = useMemo(
-    () =>
-      [...state.categories].sort((left, right) => {
-        if (left.isDefault !== right.isDefault) {
-          return left.isDefault ? -1 : 1
-        }
-
-        return left.name.localeCompare(right.name)
-      }),
+  const managedCategories = useMemo(
+    () => getVisibleManagedCategories(state.categories),
     [state.categories],
+  )
+  const sortedCategories = useMemo(
+    () => [...managedCategories].sort((left, right) => left.name.localeCompare(right.name)),
+    [managedCategories],
   )
 
   const linkedTransactionsByCategoryId = useMemo(() => {
@@ -291,24 +360,94 @@ export function SettingsScreen({
     return counts
   }, [state.transactions])
 
+  const activeRecurringTemplates = useMemo(
+    () =>
+      state.recurringTemplates
+        .filter((template) => template.active)
+        .sort((left, right) => left.nextDueDate.localeCompare(right.nextDueDate)),
+    [state.recurringTemplates],
+  )
+
   const categoryBeingEdited =
     editingCategoryId && editingCategoryId !== 'create'
-      ? state.categories.find((category) => category.id === editingCategoryId) ?? null
+      ? managedCategories.find((category) => category.id === editingCategoryId) ?? null
       : null
+
+  const requiredReplacementTypes = useMemo(() => {
+    if (!categoryBeingEdited) {
+      return [] as Array<'income' | 'expense'>
+    }
+
+    const typeSet = new Set<'income' | 'expense'>()
+
+    state.transactions
+      .filter((transaction) => transaction.categoryId === categoryBeingEdited.id)
+      .forEach((transaction) => {
+        typeSet.add(transaction.type)
+      })
+
+    state.recurringTemplates
+      .filter((template) => template.categoryId === categoryBeingEdited.id)
+      .forEach((template) => {
+        typeSet.add(template.type)
+      })
+
+    return [...typeSet]
+  }, [categoryBeingEdited, state.recurringTemplates, state.transactions])
+
+  const replacementCategories = useMemo(() => {
+    if (!categoryBeingEdited) {
+      return [] as Category[]
+    }
+
+    return sortedCategories.filter((category) => {
+      if (category.id === categoryBeingEdited.id) {
+        return false
+      }
+
+      return requiredReplacementTypes.every((type) => categorySupportsType(category, type))
+    })
+  }, [categoryBeingEdited, requiredReplacementTypes, sortedCategories])
+
+  const effectiveReplacementCategoryId =
+    replacementCategories.find((category) => category.id === replacementCategoryId)?.id ??
+    replacementCategories[0]?.id ??
+    null
+
+  const categoryDeletionInput = useMemo(
+    () =>
+      categoryBeingEdited
+        ? {
+            categoryId: categoryBeingEdited.id,
+            strategy: deletionStrategy,
+            replacementCategoryId:
+              deletionStrategy === 'reassign' ? effectiveReplacementCategoryId : null,
+          }
+        : null,
+    [categoryBeingEdited, deletionStrategy, effectiveReplacementCategoryId],
+  )
+
+  const categoryDeletionPreview = useMemo(() => {
+    if (!categoryDeletionInput) {
+      return null
+    }
+
+    return previewCategoryDeletion(categoryDeletionInput)
+  }, [categoryDeletionInput, previewCategoryDeletion])
+
+  const deletionImpactSummary =
+    categoryDeletionPreview && categoryDeletionPreview.ok
+      ? `${categoryDeletionPreview.plan.impact.transactionCount} transactions, ${categoryDeletionPreview.plan.impact.recurringTemplateCount} recurring templates, ${categoryDeletionPreview.plan.impact.affectedBudgetCount} budgets affected.`
+      : categoryDeletionPreview?.message ?? null
+
+  const deletionConfirmationText =
+    categoryDeletionPreview && categoryDeletionPreview.ok
+      ? `Delete category ${categoryDeletionPreview.plan.impact.categoryName}?\n\nThis will move ${categoryDeletionPreview.plan.impact.transactionCount} transactions and ${categoryDeletionPreview.plan.impact.recurringTemplateCount} recurring templates to ${categoryDeletionPreview.plan.impact.replacementCategoryName}.\n\nBudgets updated: ${categoryDeletionPreview.plan.impact.budgetsKeepingCategoriesCount}\nBudgets removed: ${categoryDeletionPreview.plan.impact.budgetsDeletedCount}`
+      : 'Delete this category?'
 
   const editingLinkedCount = categoryBeingEdited
     ? linkedTransactionsByCategoryId.get(categoryBeingEdited.id) ?? 0
     : 0
-
-  const syncStatusLabel = isSyncing
-    ? 'Syncing'
-    : !isOnline
-      ? 'Offline'
-      : syncSummary.failed > 0
-        ? `${syncSummary.failed} failed`
-        : syncSummary.pending > 0
-          ? `${syncSummary.pending} pending`
-          : 'Synced'
 
   const handleExportCsv = () => {
     downloadTextFile(
@@ -390,12 +529,29 @@ export function SettingsScreen({
       const linkedTransactions = state.transactions.filter(
         (transaction) => transaction.categoryId === editingId,
       )
+      const linkedRecurringTemplates = state.recurringTemplates.filter(
+        (template) => template.categoryId === editingId,
+      )
       const incompatibleKind = linkedTransactions.some(
         (transaction) => input.kind !== 'both' && transaction.type !== input.kind,
+      )
+      const incompatibleRecurringKind = linkedRecurringTemplates.some(
+        (template) => input.kind !== 'both' && template.type !== input.kind,
+      )
+      const hasLinkedBudgets = state.budgets.some((budget) =>
+        budget.categoryIds.includes(editingId),
       )
 
       if (incompatibleKind) {
         return 'This category already has linked transactions of the other type.'
+      }
+
+      if (incompatibleRecurringKind) {
+        return 'This category already has recurring templates of the other type.'
+      }
+
+      if (input.kind === 'income' && hasLinkedBudgets) {
+        return 'Budgets are linked to this category. Move or remove those budgets first.'
       }
 
       updateCategory({
@@ -418,29 +574,76 @@ export function SettingsScreen({
   }
 
   const handleDeleteCategory = (): string | null => {
-    if (!categoryBeingEdited) {
+    if (!categoryDeletionInput) {
       return 'Category not found.'
     }
 
-    if (categoryBeingEdited.isDefault) {
-      return 'Default categories cannot be deleted.'
+    const preview = previewCategoryDeletion(categoryDeletionInput)
+
+    if (!preview.ok) {
+      return preview.message
     }
 
-    if ((linkedTransactionsByCategoryId.get(categoryBeingEdited.id) ?? 0) > 0) {
-      return 'Delete or reassign linked transactions before removing this category.'
-    }
+    const deleteMessage = deleteCategory(categoryDeletionInput)
 
-    deleteCategory(categoryBeingEdited.id)
+    if (deleteMessage) {
+      return deleteMessage
+    }
 
     return null
   }
 
   const openCategoryEditor = (categoryId: string | 'create') => {
     setEditingCategoryId(categoryId)
+
+    if (categoryId === 'create') {
+      setDeletionStrategy('uncategorized')
+      setReplacementCategoryId(null)
+      return
+    }
+
+    const category = managedCategories.find((entry) => entry.id === categoryId)
+
+    if (!category) {
+      setDeletionStrategy('uncategorized')
+      setReplacementCategoryId(null)
+      return
+    }
+
+    const linkedTypes = new Set<'income' | 'expense'>()
+    state.transactions
+      .filter((transaction) => transaction.categoryId === category.id)
+      .forEach((transaction) => {
+        linkedTypes.add(transaction.type)
+      })
+    state.recurringTemplates
+      .filter((template) => template.categoryId === category.id)
+      .forEach((template) => {
+        linkedTypes.add(template.type)
+      })
+
+    const initialReplacementOptions = managedCategories.filter((entry) => {
+      if (entry.id === category.id) {
+        return false
+      }
+
+      return [...linkedTypes].every((type) => categorySupportsType(entry, type))
+    })
+
+    if (initialReplacementOptions.length > 0) {
+      setDeletionStrategy('reassign')
+      setReplacementCategoryId(initialReplacementOptions[0].id)
+      return
+    }
+
+    setDeletionStrategy('uncategorized')
+    setReplacementCategoryId(null)
   }
 
   const closeCategoryEditor = () => {
     setEditingCategoryId(null)
+    setDeletionStrategy('uncategorized')
+    setReplacementCategoryId(null)
   }
 
   return (
@@ -467,12 +670,29 @@ export function SettingsScreen({
 
               <div className="settings-list-row settings-control-row">
                 <span className="settings-row-label">Theme</span>
-                <ThemeToggle
-                  theme={state.settings.theme}
-                  onToggle={() =>
-                    setTheme(state.settings.theme === 'dark' ? 'light' : 'dark')
-                  }
-                />
+                <div className="settings-inline-switch" role="group" aria-label="Theme">
+                  <button
+                    type="button"
+                    className={state.settings.theme === 'auto' ? 'active' : ''}
+                    onClick={() => setTheme('auto')}
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    className={state.settings.theme === 'light' ? 'active' : ''}
+                    onClick={() => setTheme('light')}
+                  >
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    className={state.settings.theme === 'dark' ? 'active' : ''}
+                    onClick={() => setTheme('dark')}
+                  >
+                    Dark
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -570,6 +790,41 @@ export function SettingsScreen({
                 <span className="settings-row-label">Export CSV</span>
                 <span className="settings-row-caption">Transactions only</span>
               </button>
+
+              {canInstall ? (
+                <button
+                  type="button"
+                  className="settings-list-row settings-action-row"
+                  onClick={onInstall}
+                >
+                  <span className="settings-row-label">Install app</span>
+                  <span className="settings-row-caption">Add to this device</span>
+                </button>
+              ) : null}
+            </div>
+
+            {isInstalled ? <p className="support-copy">App is already installed on this device.</p> : null}
+          </div>
+
+          <div className="settings-group">
+            <p className="settings-group-title">Recurring</p>
+
+            <div className="settings-group-list">
+              <button
+                type="button"
+                className="settings-list-row settings-nav-row"
+                onClick={() => setView('recurring')}
+              >
+                <div className="settings-row-copy">
+                  <span className="settings-row-label">Manage recurring</span>
+                  <span className="settings-row-caption">
+                    {activeRecurringTemplates.length} active
+                  </span>
+                </div>
+                <span className="settings-row-chevron" aria-hidden="true">
+                  {'>'}
+                </span>
+              </button>
             </div>
           </div>
 
@@ -590,96 +845,8 @@ export function SettingsScreen({
             </div>
           </div>
 
-          <div className="settings-group">
-            <p className="settings-group-title">Sync</p>
-
-            <div className="settings-group-list">
-              <div className="settings-list-row">
-                <span className="settings-row-label">Status</span>
-                <span className="settings-row-value">{syncStatusLabel}</span>
-              </div>
-              <div className="settings-list-row">
-                <span className="settings-row-label">Last synced</span>
-                <span className="settings-row-value">{formatDateTimeLabel(state.lastSyncedAt)}</span>
-              </div>
-            </div>
-
-            <div className="settings-sync-actions">
-              <button
-                type="button"
-                className="submit-button compact"
-                onClick={() => {
-                  void syncNow()
-                }}
-                disabled={!isOnline || isSyncing}
-              >
-                {isSyncing ? 'Syncing...' : 'Sync now'}
-              </button>
-
-              {canInstall ? (
-                <button
-                  type="button"
-                  className="ghost-button compact"
-                  onClick={onInstall}
-                >
-                  Install app
-                </button>
-              ) : null}
-            </div>
-
-            {isInstalled ? <p className="support-copy">App is already installed on this device.</p> : null}
-            {state.lastSyncError ? <p className="inline-error">{state.lastSyncError}</p> : null}
-          </div>
-
-          <div className="settings-group settings-advanced-group">
-            <button
-              type="button"
-              className="settings-advanced-toggle"
-              onClick={() => setIsAdvancedOpen((current) => !current)}
-            >
-              <span className="settings-row-label">Advanced settings</span>
-              <span className="settings-row-chevron" aria-hidden="true">
-                {isAdvancedOpen ? '−' : '+'}
-              </span>
-            </button>
-
-            {isAdvancedOpen ? (
-              <div className="settings-advanced-body">
-                <label>
-                  Sync endpoint
-                  <input
-                    type="url"
-                    value={state.settings.syncEndpoint}
-                    onChange={(event) => setSyncEndpoint(event.target.value)}
-                    placeholder="demo://local or https://your-api/sync"
-                  />
-                </label>
-
-                <div className="settings-endpoint-buttons">
-                  <button
-                    type="button"
-                    className="ghost-button compact"
-                    onClick={() => setSyncEndpoint('demo://local')}
-                  >
-                    Use demo sync
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button compact"
-                    onClick={() => setSyncEndpoint('http://localhost:8787/api/sync')}
-                  >
-                    Use local API
-                  </button>
-                </div>
-
-                <p className="support-copy">
-                  Conflict policy is <strong>client wins</strong>. Local changes stay source of truth.
-                </p>
-              </div>
-            ) : null}
-          </div>
         </section>
-      ) : (
+      ) : view === 'categories' ? (
         <section className="panel settings-list-panel">
           <div className="settings-categories-header">
             <button
@@ -693,7 +860,7 @@ export function SettingsScreen({
             <div>
               <p className="eyebrow">CATEGORIES</p>
               <h3>Manage categories</h3>
-              <p>Tap a row to edit. Delete lives inside the editor.</p>
+              <p>Tap a row to edit. Deletion now supports reassignment or Uncategorized fallback.</p>
             </div>
 
             <button
@@ -730,15 +897,81 @@ export function SettingsScreen({
                   </div>
 
                   <div className="settings-category-meta">
-                    {category.isDefault ? (
-                      <span className="micro-badge subtle">default</span>
-                    ) : null}
                     <span className="settings-category-count">{linkedCount} linked</span>
                   </div>
                 </button>
               )
             })}
           </div>
+        </section>
+      ) : (
+        <section className="panel settings-list-panel">
+          <div className="settings-categories-header">
+            <button
+              type="button"
+              className="ghost-button compact"
+              onClick={() => setView('main')}
+            >
+              Back
+            </button>
+
+            <div>
+              <p className="eyebrow">RECURRING</p>
+              <h3>Recurring transactions</h3>
+              <p>Manage future occurrences without changing past records.</p>
+            </div>
+
+            <span className="micro-badge subtle">
+              {activeRecurringTemplates.length} active
+            </span>
+          </div>
+
+          {activeRecurringTemplates.length === 0 ? (
+            <p className="empty-state">
+              Recurring items you create will appear here for future editing.
+            </p>
+          ) : (
+            <div className="settings-group-list settings-category-list-panel">
+              {activeRecurringTemplates.map((template) => {
+                const category = state.categories.find(
+                  (entry) => entry.id === template.categoryId,
+                )
+
+                return (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className="settings-category-row"
+                    onClick={() => onOpenRecurringEditor(template.id)}
+                  >
+                    <div className="settings-category-main">
+                      <span
+                        className="chip-dot"
+                        aria-hidden="true"
+                        style={{ backgroundColor: category?.color ?? 'var(--accent)' }}
+                      />
+
+                      <div className="settings-category-info">
+                        <strong>
+                          {getRecurringTemplateLabel(template, category?.name)}
+                        </strong>
+                        <span className="settings-category-kind">
+                          {getRecurringFrequencyLabel(template)} · due {formatLongDateLabel(template.nextDueDate)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="settings-category-meta recurring-settings-meta">
+                      <span className="micro-badge subtle">{template.type}</span>
+                      <strong className="settings-row-value">
+                        {formatCurrency(template.amount, state.settings.currency)}
+                      </strong>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </section>
       )}
 
@@ -748,6 +981,18 @@ export function SettingsScreen({
           mode={editingCategoryId === 'create' ? 'create' : 'edit'}
           initialCategory={categoryBeingEdited}
           linkedCount={editingLinkedCount}
+          deletionStrategy={deletionStrategy}
+          replacementCategoryId={effectiveReplacementCategoryId}
+          replacementCategories={replacementCategories}
+          deletionImpactSummary={deletionImpactSummary}
+          deletionConfirmationText={deletionConfirmationText}
+          canDelete={Boolean(categoryBeingEdited)}
+          onDeletionStrategyChange={(strategy) => {
+            setDeletionStrategy(strategy)
+          }}
+          onReplacementCategoryChange={(categoryId) => {
+            setReplacementCategoryId(categoryId)
+          }}
           onClose={closeCategoryEditor}
           onSave={handleSaveCategory}
           onDelete={handleDeleteCategory}
