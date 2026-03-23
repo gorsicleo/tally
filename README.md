@@ -1,20 +1,87 @@
-# Tally
+<div align="center">
+  <img width="217" src="./public/icon-512.png" alt="Tally Icon" />
+</div>
 
-Tally is a mobile-first personal finance tracker built with React, TypeScript, and Vite.
+<div align="center">
+  <h1><b>Tally</b></h1>
+  <p><i>A fast, mobile-first personal finance tracker built for simplicity and control.</i></p>
+</div>
 
-## Current Scope
+## Overview
 
-- Home, Records, Insights, Budgets, and Settings screens.
-- Global quick-add income and expense entry, with Home as the primary overview screen.
-- Edit and delete transaction history.
-- Default and custom categories, including income/expense/both category kinds.
-- Grouped record history with search, lightweight filters, and running totals.
-- Monthly summary, recent activity, category totals, and simplified trend views.
-- Optional monthly category budgets.
-- IndexedDB-first offline persistence with runtime validation.
-- Sync queue metadata, manual sync action, and sync-on-open when online.
-- Theme, currency, sync status, category management, CSV/JSON export, and JSON backup import in Settings.
-- PWA install prompt handling and offline shell support.
+**Tally** is a modern, mobile-first personal finance tracker designed to be:
+
+- Fast and offline-first
+- Simple but powerful
+- Installable as a PWA
+
+It focuses on **clarity, speed, and usability**, without unnecessary complexity.
+
+## Features
+
+### Core Functionality
+
+- Track income and expenses
+- Edit and delete transactions
+- Categorize transactions (default and custom)
+- Grouped history with search, date presets, and filters
+- Running totals and monthly summaries
+- Export transactions to CSV
+
+### Dashboard (Home)
+
+- Monthly summary
+- Recent activity
+- Category breakdown
+- Quick-add transactions
+
+### Insights
+
+- Monthly trend view
+- Category totals
+- Month-over-month comparison
+
+### Budgets
+
+- Optional monthly budgets per category
+- Overspend and at-risk indicators
+- Quick budget editing from the Budgets screen
+
+### Backup and Restore
+
+- JSON backup export and restore
+- Backup reminders and last-backup tracking
+- Strict backup import validation with clear error messages
+
+### Settings
+
+- Theme toggle (light and dark)
+- Currency selection
+- Category management
+- Sync status and manual sync trigger
+- Optional install prompt (PWA)
+
+## Offline-First
+
+- IndexedDB-based persistence
+- Works fully offline
+- Offline changes are retained until synced
+
+## Additional Options
+
+- Backup reminders
+- Install as app (mobile and desktop)
+- Privacy-first onboarding modal
+- Export:
+  - CSV
+  - JSON
+
+## PWA Support
+
+- Installable on mobile and desktop
+- Offline shell support
+- Custom app icons
+- Add to Home Screen support
 
 ## Run Locally
 
@@ -23,33 +90,74 @@ npm install
 npm run dev
 ```
 
-Build production output:
+### Test
+
+```bash
+npm run test
+```
+
+### Lint
+
+```bash
+npm run lint
+```
+
+### Build
 
 ```bash
 npm run build
 ```
 
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
 ## Project Structure
 
-```
+```text
 src/
-  domain/        # Core models, validation, formatters, selectors, exporters
-  features/      # UI modules for home, transactions, insights, budgets, settings, and shell
-  persistence/   # IndexedDB + fallback persistence helpers
-  pwa/           # Service worker registration + install prompt hook
-  state/         # Reducer + context store
-  sync/          # Sync client and endpoint contract handling
-  utils/         # Shared utility helpers
+  backup/        Backup, restore, and reminder logic
+  domain/        Models, selectors, validation, formatting, and business logic
+  features/      Screen-level UI modules (home, transactions, insights, budgets, settings)
+  persistence/   IndexedDB and local state persistence
+  pwa/           Service worker registration and install prompt handling
+  state/         Finance context, reducer, and store interfaces
+  sync/          Queue sync client and related sync flow
+  utils/         Shared utilities (date, id, download, etc.)
 ```
 
-## Architecture Notes
+## Architecture
 
-- `domain` stays framework-light so calculations/selectors are easy to test and reuse.
-- `state/finance-context.tsx` contains reducer/provider logic, while `state/finance-store.ts` and `state/use-finance.ts` expose typed context contracts and hooks.
-- `persistence/finance-storage.ts` hydrates validated state from IndexedDB and writes a localStorage fallback copy.
-- PWA manifest metadata is generated from `vite.config.ts`, keeping icons and install metadata in one place.
-- `sync/client.ts` supports a demo local sync target (`demo://local`) plus configurable HTTP endpoints.
-- Conflict policy is currently `client-wins`, which is exposed in settings and carried through sync configuration.
-- `features/*` hold presentation and interaction; global state changes stay in the store layer.
+Tally follows a React + TypeScript architecture with clear boundaries:
 
-This layout is intended to support future additions like recurring transactions, richer analytics, multi-device sync, auth, and server-backed collaboration without rewriting the existing core.
+- UI Layer (`src/features/`): renders screens/components and dispatches actions
+- State Layer (`src/state/`): central state with context + reducer updates
+- Domain Layer (`src/domain/`): pure, reusable business logic and selectors
+- Persistence Layer (`src/persistence/`): local durable storage for offline-first use
+- Sync Layer (`src/sync/`): optional queue-based synchronization to a configured endpoint
+
+This split keeps business logic testable and the UI focused on interaction.
+
+## Limitations
+
+- Single-user local app; no built-in accounts or multi-device identity
+- Sync requires a compatible endpoint implementation; no hosted backend is included
+- Clearing browser/app storage can remove local data
+- Backup files are plain JSON and should be handled securely
+- No built-in advanced accounting or tax/reporting workflows beyond current insights and CSV export
+
+## Contributing
+
+Contributions are welcome.
+
+If you would like to help:
+
+- Open an issue
+- Submit a PR
+- Suggest features or improvements
+
+## License
+
+MIT
