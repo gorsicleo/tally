@@ -235,7 +235,7 @@ describe('TransactionEditorSheet', () => {
   it('deletes an existing transaction after confirmation', async () => {
     vi.useFakeTimers()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const { user, onDelete, onClose } = renderSheet({
+    const { onDelete, onClose } = renderSheet({
       mode: 'edit',
       initialTransaction: createTransaction(),
     })
