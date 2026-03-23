@@ -5,12 +5,14 @@ import { SettingsScreen } from './settings-screen'
 import { createFinanceContextValue, renderWithFinance } from '../../test/finance-test-utils'
 import { initialFinanceState } from '../../domain/default-data'
 import type { FinanceState } from '../../domain/models'
+import type { PreparedBackupRestoreResult } from '../../backup/backup-models'
+import type { FinanceContextValue } from '../../state/finance-store'
 
 const restoreState = vi.hoisted(() => ({
   result: {
     ok: false as const,
     message: 'This backup file is not valid.',
-  },
+  } as PreparedBackupRestoreResult,
 }))
 
 vi.mock('../../backup/restore-service', () => ({
@@ -33,7 +35,10 @@ function createState(overrides: Partial<FinanceState> = {}): FinanceState {
   }
 }
 
-function renderScreen(state: FinanceState, overrides = {}) {
+function renderScreen(
+  state: FinanceState,
+  overrides: Partial<FinanceContextValue> = {},
+) {
   const replaceState = vi.fn(async () => undefined)
   const onShowToast = vi.fn()
   const onOpenRecurringEditor = vi.fn()
