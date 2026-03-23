@@ -69,7 +69,6 @@ describe('computeCategoryDeletionPlan', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-21T08:00:00.000Z',
           updatedAt: '2026-03-21T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })
@@ -98,7 +97,6 @@ describe('computeCategoryDeletionPlan', () => {
           limit: 200,
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })
@@ -143,7 +141,6 @@ describe('computeCategoryDeletionPlan', () => {
           limit: 300,
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       recurringTemplates: [
@@ -160,7 +157,6 @@ describe('computeCategoryDeletionPlan', () => {
           active: true,
           createdAt: '2026-03-01T00:00:00.000Z',
           updatedAt: '2026-03-01T00:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })

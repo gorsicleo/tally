@@ -73,8 +73,6 @@ export interface ApplyRecurringOccurrencesInput {
 export interface FinanceContextValue {
   state: FinanceState
   isLoaded: boolean
-  isOnline: boolean
-  isSyncing: boolean
   addCategory: (input: AddCategoryInput) => void
   updateCategory: (input: UpdateCategoryInput) => void
   previewCategoryDeletion: (
@@ -93,10 +91,8 @@ export interface FinanceContextValue {
   removeBudget: (budgetId: string) => void
   setTheme: (theme: ThemeMode) => void
   setCurrency: (currency: string) => void
-  setSyncEndpoint: (endpoint: string) => void
   updateBackupSettings: (settings: Partial<BackupPreferences>) => void
   replaceState: (nextState: FinanceState) => Promise<void>
-  syncNow: () => Promise<boolean>
 }
 
 export const FinanceContext = createContext<FinanceContextValue | undefined>(

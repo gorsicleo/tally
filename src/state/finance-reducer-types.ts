@@ -43,9 +43,3 @@ export type FinanceAction =
   | { type: 'set-budget'; payload: Budget }
   | { type: 'remove-budget'; payload: { id: string } }
   | { type: 'update-settings'; payload: Partial<AppSettings> }
-  | { type: 'sync-attempt'; payload: { at: string } }
-  | { type: 'sync-success'; payload: { at: string; operationIds: string[] } }
-  | {
-      type: 'sync-failure'
-      payload: { at: string; operationIds: string[]; error: string }
-    }

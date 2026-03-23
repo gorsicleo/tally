@@ -30,7 +30,6 @@ export function createUncategorizedCategory(
     system: 'uncategorized',
     createdAt: timestamp,
     updatedAt: timestamp,
-    syncStatus: 'synced',
   }
 }
 

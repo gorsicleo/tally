@@ -2,7 +2,6 @@ import { validateBudgetCategoryIds } from '../../domain/budget-service'
 import type { Budget, FinanceState } from '../../domain/models'
 import type { FinanceAction } from '../finance-reducer-types'
 import { recordMeaningfulChange } from '../reducer-utils/change-tracking'
-import { queueOperation } from '../reducer-utils/queue'
 
 type SetBudgetAction = Extract<FinanceAction, { type: 'set-budget' }>
 type RemoveBudgetAction = Extract<FinanceAction, { type: 'remove-budget' }>
@@ -43,13 +42,6 @@ export function handleSetBudget(
   return recordMeaningfulChange({
     ...state,
     budgets: nextBudgets,
-    syncQueue: queueOperation(
-      state.syncQueue,
-      'budget',
-      'upsert',
-      normalizedBudget.id,
-      normalizedBudget,
-    ),
   })
 }
 
@@ -68,12 +60,5 @@ export function handleRemoveBudget(
   return recordMeaningfulChange({
     ...state,
     budgets: state.budgets.filter((budget) => budget.id !== action.payload.id),
-    syncQueue: queueOperation(
-      state.syncQueue,
-      'budget',
-      'delete',
-      action.payload.id,
-      null,
-    ),
   })
 }

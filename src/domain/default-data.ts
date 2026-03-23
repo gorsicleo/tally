@@ -17,7 +17,6 @@ export const initialFinanceState: FinanceState = {
       system: 'uncategorized',
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-salary',
@@ -27,7 +26,6 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-freelance',
@@ -37,7 +35,6 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-food',
@@ -47,7 +44,6 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-transport',
@@ -57,7 +53,6 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-housing',
@@ -67,7 +62,6 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-shopping',
@@ -77,7 +71,6 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
     {
       id: 'cat-fun',
@@ -87,25 +80,18 @@ export const initialFinanceState: FinanceState = {
       system: null,
       createdAt: now,
       updatedAt: now,
-      syncStatus: 'synced',
     },
   ],
   transactions: [],
   budgets: [],
   recurringTemplates: [],
-  syncQueue: [],
   settings: {
     theme: 'dark',
     currency: 'USD',
-    syncEndpoint: 'demo://local',
-    conflictPolicy: 'client-wins',
     hasSeenPrivacyModal: false,
     backupRemindersEnabled: true,
     lastBackupAt: null,
     changesSinceBackup: 0,
     lastReminderAt: null,
   },
-  lastSyncedAt: null,
-  lastSyncAttemptAt: null,
-  lastSyncError: null,
 }

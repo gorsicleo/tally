@@ -4,7 +4,6 @@ import type { FinanceAction } from '../finance-reducer-types'
 type HydrateAction = Extract<FinanceAction, { type: 'hydrate' }>
 type ReplaceStateAction = Extract<FinanceAction, { type: 'replace-state' }>
 type UpdateSettingsAction = Extract<FinanceAction, { type: 'update-settings' }>
-type SyncAttemptAction = Extract<FinanceAction, { type: 'sync-attempt' }>
 
 export function handleHydrate(
   _state: FinanceState,
@@ -30,15 +29,5 @@ export function handleUpdateSettings(
       ...state.settings,
       ...action.payload,
     },
-  }
-}
-
-export function handleSyncAttempt(
-  state: FinanceState,
-  action: SyncAttemptAction,
-): FinanceState {
-  return {
-    ...state,
-    lastSyncAttemptAt: action.payload.at,
   }
 }

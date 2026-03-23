@@ -17,7 +17,6 @@ import { useInstallPrompt } from './pwa/register-service-worker'
 import { AppHeader } from './features/shell/app-header'
 import { TabBar, type AppTab } from './features/shell/tab-bar'
 import {
-  APP_HEADER_STATUS_MODE,
   getActiveTabMeta,
   getHeaderVariant,
 } from './features/shell/app-tab-metadata'
@@ -80,7 +79,6 @@ function FinanceWorkspace() {
   }
 
   const activeMeta = getActiveTabMeta(activeTab, currentMonthLabel)
-  const headerStatusMode = APP_HEADER_STATUS_MODE
   const headerVariant = getHeaderVariant(activeTab)
 
   useEffect(() => {
@@ -253,10 +251,6 @@ function FinanceWorkspace() {
         key={activeTab}
         title={activeMeta.title}
         subtitle={activeMeta.subtitle}
-        syncLabel=""
-        isOnline={true}
-        isSyncing={false}
-        statusMode={headerStatusMode}
         variant={headerVariant}
       />
 

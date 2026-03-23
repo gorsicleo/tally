@@ -8,7 +8,6 @@ import {
 import {
   handleHydrate,
   handleReplaceState,
-  handleSyncAttempt,
   handleUpdateSettings,
 } from './reducer-cases/meta-settings'
 import {
@@ -22,13 +21,6 @@ import {
   isCategoryCompatible,
 } from './reducer-utils/category-compat'
 import { recordMeaningfulChange } from './reducer-utils/change-tracking'
-import {
-  entityKey,
-  queueBudgetUpserts,
-  queueOperation,
-  queueTransactionUpserts,
-} from './reducer-utils/queue'
-import { markEntityStatus } from './reducer-utils/sync-status'
 
 export function financeReducer(
   state: FinanceState,
@@ -54,13 +46,6 @@ export function financeReducer(
       return recordMeaningfulChange({
         ...state,
         categories: [...state.categories, action.payload],
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'category',
-          'upsert',
-          action.payload.id,
-          action.payload,
-        ),
       })
     }
 
@@ -108,13 +93,6 @@ export function financeReducer(
         categories: state.categories.map((category) =>
           category.id === action.payload.id ? action.payload : category,
         ),
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'category',
-          'upsert',
-          action.payload.id,
-          action.payload,
-        ),
       })
     }
 
@@ -147,14 +125,9 @@ export function financeReducer(
               ...transaction,
               categoryId: replacementCategory.id,
               updatedAt,
-              syncStatus: 'pending' as const,
             }
           : transaction,
       )
-      const reassignedTransactions = nextTransactions.filter((transaction) =>
-        transactionIdSet.has(transaction.id),
-      )
-
       const nextRecurringTemplates = state.recurringTemplates.map((template) =>
         recurringTemplateIdSet.has(template.id)
           ? {
@@ -165,8 +138,6 @@ export function financeReducer(
           : template,
       )
 
-      const reassignedBudgets: Budget[] = []
-      const deletedBudgetIds: string[] = []
       const nextBudgets = state.budgets.flatMap((budget) => {
         const outcome = budgetOutcomeById.get(budget.id)
 
@@ -175,7 +146,6 @@ export function financeReducer(
         }
 
         if (outcome.nextCategoryIds === null) {
-          deletedBudgetIds.push(budget.id)
           return []
         }
 
@@ -183,28 +153,10 @@ export function financeReducer(
           ...budget,
           categoryIds: outcome.nextCategoryIds,
           updatedAt,
-          syncStatus: 'pending',
         }
 
-        reassignedBudgets.push(nextBudget)
         return nextBudget
       })
-
-      let nextSyncQueue = queueOperation(
-        state.syncQueue,
-        'category',
-        'delete',
-        existingCategory.id,
-        null,
-      )
-
-      nextSyncQueue = queueTransactionUpserts(nextSyncQueue, reassignedTransactions)
-      nextSyncQueue = queueBudgetUpserts(nextSyncQueue, reassignedBudgets)
-      nextSyncQueue = deletedBudgetIds.reduce(
-        (queue, budgetId) =>
-          queueOperation(queue, 'budget', 'delete', budgetId, null),
-        nextSyncQueue,
-      )
 
       return recordMeaningfulChange({
         ...state,
@@ -214,7 +166,6 @@ export function financeReducer(
           (category) => category.id !== existingCategory.id,
         ),
         budgets: nextBudgets,
-        syncQueue: nextSyncQueue,
       })
     }
 
@@ -318,7 +269,6 @@ export function financeReducer(
               }
             : template,
         ),
-        syncQueue: queueTransactionUpserts(state.syncQueue, action.payload.transactions),
       })
     }
 
@@ -355,107 +305,6 @@ export function financeReducer(
 
     case 'update-settings':
       return handleUpdateSettings(state, action)
-
-    case 'sync-attempt':
-      return handleSyncAttempt(state, action)
-
-    case 'sync-success': {
-      const appliedIds = new Set(action.payload.operationIds)
-      const appliedOperations = state.syncQueue.filter((operation) =>
-        appliedIds.has(operation.id),
-      )
-      const remainingQueue = state.syncQueue.filter(
-        (operation) => !appliedIds.has(operation.id),
-      )
-      const appliedTransactions = new Set(
-        appliedOperations
-          .filter((operation) => operation.entityType === 'transaction')
-          .map((operation) => operation.entityId),
-      )
-      const appliedCategories = new Set(
-        appliedOperations
-          .filter((operation) => operation.entityType === 'category')
-          .map((operation) => operation.entityId),
-      )
-      const appliedBudgets = new Set(
-        appliedOperations
-          .filter((operation) => operation.entityType === 'budget')
-          .map((operation) => operation.entityId),
-      )
-      const stillQueued = new Set(
-        remainingQueue.map((operation) => entityKey(operation.entityType, operation.entityId)),
-      )
-
-      return {
-        ...state,
-        transactions: markEntityStatus(
-          state.transactions,
-          new Set(
-            [...appliedTransactions].filter(
-              (id) => !stillQueued.has(entityKey('transaction', id)),
-            ),
-          ),
-          'synced',
-        ),
-        categories: markEntityStatus(
-          state.categories,
-          new Set(
-            [...appliedCategories].filter(
-              (id) => !stillQueued.has(entityKey('category', id)),
-            ),
-          ),
-          'synced',
-        ),
-        budgets: markEntityStatus(
-          state.budgets,
-          new Set(
-            [...appliedBudgets].filter(
-              (id) => !stillQueued.has(entityKey('budget', id)),
-            ),
-          ),
-          'synced',
-        ),
-        syncQueue: remainingQueue,
-        lastSyncedAt: action.payload.at,
-        lastSyncError: null,
-      }
-    }
-
-    case 'sync-failure': {
-      const failedIds = new Set(action.payload.operationIds)
-      const failedOperations = state.syncQueue.filter((operation) =>
-        failedIds.has(operation.id),
-      )
-      const failedTransactions = new Set(
-        failedOperations
-          .filter((operation) => operation.entityType === 'transaction')
-          .map((operation) => operation.entityId),
-      )
-      const failedCategories = new Set(
-        failedOperations
-          .filter((operation) => operation.entityType === 'category')
-          .map((operation) => operation.entityId),
-      )
-      const failedBudgets = new Set(
-        failedOperations
-          .filter((operation) => operation.entityType === 'budget')
-          .map((operation) => operation.entityId),
-      )
-
-      return {
-        ...state,
-        transactions: markEntityStatus(state.transactions, failedTransactions, 'failed'),
-        categories: markEntityStatus(state.categories, failedCategories, 'failed'),
-        budgets: markEntityStatus(state.budgets, failedBudgets, 'failed'),
-        syncQueue: state.syncQueue.map((operation) =>
-          failedIds.has(operation.id)
-            ? { ...operation, attempts: operation.attempts + 1 }
-            : operation,
-        ),
-        lastSyncAttemptAt: action.payload.at,
-        lastSyncError: action.payload.error,
-      }
-    }
 
     default:
       return state

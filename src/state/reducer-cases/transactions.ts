@@ -2,7 +2,6 @@ import type { FinanceState } from '../../domain/models'
 import type { FinanceAction } from '../finance-reducer-types'
 import { isCategoryCompatible } from '../reducer-utils/category-compat'
 import { recordMeaningfulChange } from '../reducer-utils/change-tracking'
-import { queueOperation } from '../reducer-utils/queue'
 
 type AddTransactionAction = Extract<FinanceAction, { type: 'add-transaction' }>
 type UpdateTransactionAction = Extract<FinanceAction, { type: 'update-transaction' }>
@@ -27,13 +26,6 @@ export function handleAddTransaction(
   return recordMeaningfulChange({
     ...state,
     transactions: [action.payload, ...state.transactions],
-    syncQueue: queueOperation(
-      state.syncQueue,
-      'transaction',
-      'upsert',
-      action.payload.id,
-      action.payload,
-    ),
   })
 }
 
@@ -62,13 +54,6 @@ export function handleUpdateTransaction(
     transactions: state.transactions.map((transaction) =>
       transaction.id === action.payload.id ? action.payload : transaction,
     ),
-    syncQueue: queueOperation(
-      state.syncQueue,
-      'transaction',
-      'upsert',
-      action.payload.id,
-      action.payload,
-    ),
   })
 }
 
@@ -88,13 +73,6 @@ export function handleDeleteTransaction(
     ...state,
     transactions: state.transactions.filter(
       (transaction) => transaction.id !== action.payload.id,
-    ),
-    syncQueue: queueOperation(
-      state.syncQueue,
-      'transaction',
-      'delete',
-      action.payload.id,
-      null,
     ),
   })
 }

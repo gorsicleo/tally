@@ -24,7 +24,6 @@ function createTransaction(index: number, overrides: Partial<Transaction> = {}):
     recurringOccurrenceDate: overrides.recurringOccurrenceDate ?? null,
     createdAt: overrides.createdAt ?? `2026-03-${String((index % 28) + 1).padStart(2, '0')}T08:00:00.000Z`,
     updatedAt: overrides.updatedAt ?? `2026-03-${String((index % 28) + 1).padStart(2, '0')}T08:00:00.000Z`,
-    syncStatus: overrides.syncStatus ?? 'synced',
   }
 }
 

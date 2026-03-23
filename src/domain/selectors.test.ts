@@ -28,7 +28,6 @@ function createTransaction(
     recurringOccurrenceDate: overrides.recurringOccurrenceDate ?? null,
     createdAt: overrides.createdAt ?? `${occurredAt}T09:00:00.000Z`,
     updatedAt: overrides.updatedAt ?? `${occurredAt}T09:00:00.000Z`,
-    syncStatus: overrides.syncStatus ?? 'synced',
   }
 }
 
@@ -43,7 +42,6 @@ function createBudget(
     limit: overrides.limit ?? 500,
     createdAt: overrides.createdAt ?? '2026-03-01T09:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-03-01T09:00:00.000Z',
-    syncStatus: overrides.syncStatus ?? 'synced',
     ...overrides,
   } as Budget
 }

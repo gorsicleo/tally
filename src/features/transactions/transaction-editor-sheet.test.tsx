@@ -20,7 +20,6 @@ function createTransaction(overrides: Partial<Transaction> = {}): Transaction {
     recurringOccurrenceDate: null,
     createdAt: '2026-03-20T08:00:00.000Z',
     updatedAt: '2026-03-20T08:00:00.000Z',
-    syncStatus: 'synced',
     ...overrides,
   }
 }
@@ -41,7 +40,6 @@ function createRecurringTemplate(
     active: true,
     createdAt: '2026-03-01T08:00:00.000Z',
     updatedAt: '2026-03-01T08:00:00.000Z',
-    syncStatus: 'synced',
     ...overrides,
   }
 }

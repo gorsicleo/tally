@@ -10,8 +10,6 @@ export function createFinanceContextValue(
   return {
     state: initialFinanceState,
     isLoaded: true,
-    isOnline: true,
-    isSyncing: false,
     addCategory: () => {},
     updateCategory: () => {},
     previewCategoryDeletion: () => ({ ok: false, message: 'noop' }),
@@ -28,10 +26,8 @@ export function createFinanceContextValue(
     removeBudget: () => {},
     setTheme: () => {},
     setCurrency: () => {},
-    setSyncEndpoint: () => {},
     updateBackupSettings: () => {},
     replaceState: async () => {},
-    syncNow: async () => true,
     ...overrides,
   }
 }
