@@ -1,96 +1,157 @@
 import { useMemo, useState } from 'react'
 import { formatCurrency, formatMonthLabel } from '../../domain/formatters'
-import { getBudgetSignals, getMonthKey } from '../../domain/selectors'
+import {
+  getBudgetAllocationSummary,
+  getBudgetSignals,
+  getMonthKey,
+  shiftMonthKey,
+} from '../../domain/selectors'
 import { useFinance } from '../../state/use-finance'
 import { BudgetEditorSheet } from './budget-editor-sheet'
+import { getVisibleManagedCategories } from '../../domain/categories'
+
+function formatAvailableToBudgetLabel(
+  availableToBudget: number,
+  currency: string,
+): string {
+  if (availableToBudget < 0) {
+    return `${formatCurrency(Math.abs(availableToBudget), currency)} over-allocated`
+  }
+
+  return `${formatCurrency(Math.max(availableToBudget, 0), currency)} left`
+}
 
 export function BudgetsScreen() {
-  const { state, setBudget } = useFinance()
-  const monthKey = useMemo(() => getMonthKey(), [])
+  const { state, upsertBudget, removeBudget } = useFinance()
+  const currentMonthKey = useMemo(() => getMonthKey(), [])
+  const [monthKey, setMonthKey] = useState(currentMonthKey)
   const monthLabel = useMemo(() => formatMonthLabel(monthKey), [monthKey])
   const currency = state.settings.currency
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [editingBudgetId, setEditingBudgetId] = useState<string | 'create' | null>(null)
+  const allocationSummary = useMemo(
+    () => getBudgetAllocationSummary(state, monthKey),
+    [monthKey, state],
+  )
   const budgetSignals = useMemo(
     () => getBudgetSignals(state, monthKey),
     [monthKey, state],
   )
-  const selectedSignal = budgetSignals.find(
-    (entry) => entry.category.id === selectedCategoryId,
-  ) ?? null
-  const overspentTotal = budgetSignals.reduce(
-    (sum, entry) => sum + (entry.remaining < 0 ? Math.abs(entry.remaining) : 0),
-    0,
+  const managedExpenseCategories = useMemo(
+    () =>
+      getVisibleManagedCategories(state.categories).filter(
+        (category) => category.kind !== 'income',
+      ),
+    [state.categories],
   )
-  const atRiskCount = budgetSignals.filter((entry) => entry.tone === 'danger' || entry.tone === 'warning').length
-  const withoutBudgetCount = budgetSignals.filter((entry) => entry.tone === 'missing').length
-  const activeBudgetCount = budgetSignals.filter((entry) => entry.tone !== 'missing').length
-  const summaryHeadline =
-    overspentTotal > 0
-      ? `${formatCurrency(overspentTotal, currency)} overspent`
-      : atRiskCount > 0
-        ? `${atRiskCount} categor${atRiskCount === 1 ? 'y is' : 'ies are'} near limit`
-        : activeBudgetCount > 0
-          ? 'All budgets on track'
-          : 'No budgets set yet'
-  const summaryCopy =
-    overspentTotal > 0
-      ? 'The first rows need attention right now.'
-      : withoutBudgetCount > 0
-        ? `${withoutBudgetCount} categor${withoutBudgetCount === 1 ? 'y has' : 'ies have'} no monthly limit yet.`
-        : 'Every active budget is currently within its monthly limit.'
+  const selectedSignal = budgetSignals.find(
+    (entry) => entry.budget.id === editingBudgetId,
+  ) ?? null
+  const selectedBudget = selectedSignal?.budget ?? null
+  const availabilityLabel = formatAvailableToBudgetLabel(
+    allocationSummary.availableToBudgetForPeriod,
+    currency,
+  )
+  const allocationHelperText = !allocationSummary.hasIncomeRecorded
+    ? `No income recorded ${monthKey === currentMonthKey ? 'this month' : `for ${monthLabel}`}.`
+    : !allocationSummary.hasAllocatedBudgets
+      ? 'Start assigning budget limits to your categories.'
+      : null
+  const availabilityTone = allocationSummary.availableToBudgetForPeriod < 0
+    ? 'danger'
+    : allocationSummary.availableToBudgetForPeriod === 0
+      ? 'neutral'
+      : 'safe'
 
   return (
     <div className="screen-stack budgets-screen">
-      <section className="panel budget-overview-card">
-        <div className="budget-overview-copy">
-          <p className="eyebrow">{monthLabel}</p>
-          <h2>{summaryHeadline}</h2>
-          <p>{summaryCopy}</p>
+      <section className={`panel budget-allocation-card ${availabilityTone}`.trim()}>
+        <div className="budget-allocation-header">
+          <div>
+            <p className="eyebrow">Available to budget</p>
+            <p className="budget-allocation-period">{monthLabel}</p>
+          </div>
+
+          <div className="budget-period-switch" role="group" aria-label="Budget period">
+            <button
+              type="button"
+              className="ghost-button compact"
+              aria-label="Previous month"
+              onClick={() => {
+                setMonthKey((current) => shiftMonthKey(current, -1))
+                setEditingBudgetId(null)
+              }}
+            >
+              {'<'}
+            </button>
+
+            <button
+              type="button"
+              className="ghost-button compact"
+              aria-label="Next month"
+              onClick={() => {
+                setMonthKey((current) => shiftMonthKey(current, 1))
+                setEditingBudgetId(null)
+              }}
+            >
+              {'>'}
+            </button>
+          </div>
         </div>
 
-        <div className="budget-overview-stats">
-          <div className="budget-overview-stat">
-            <span>Overspent</span>
-            <strong>{formatCurrency(overspentTotal, currency)}</strong>
-          </div>
-          <div className="budget-overview-stat">
-            <span>At risk</span>
-            <strong>{atRiskCount}</strong>
-          </div>
-          <div className="budget-overview-stat">
-            <span>Without budgets</span>
-            <strong>{withoutBudgetCount}</strong>
-          </div>
-        </div>
+        <h2 className={`budget-allocation-value ${availabilityTone}`.trim()}>
+          {availabilityLabel}
+        </h2>
+
+        <p className="budget-allocation-meta">
+          Income {formatCurrency(allocationSummary.totalIncomeForPeriod, currency)}
+          {' • '}
+          Allocated {formatCurrency(allocationSummary.totalAllocatedBudgetLimitsForPeriod, currency)}
+        </p>
+
+        {allocationHelperText ? (
+          <p className="budget-allocation-help">{allocationHelperText}</p>
+        ) : null}
       </section>
 
-      {budgetSignals.length === 0 ? (
+      {managedExpenseCategories.length === 0 ? (
         <p className="empty-state">Create an expense category first to set a budget.</p>
       ) : (
         <section className="panel budget-signal-list" aria-label="Budget status list">
+          <div className="section-heading-row budget-list-header">
+            <div>
+              <p className="eyebrow">Budget limits</p>
+              <p>{monthLabel}</p>
+            </div>
+            <button
+              type="button"
+              className="ghost-button compact"
+              onClick={() => setEditingBudgetId('create')}
+            >
+              + Add budget
+            </button>
+          </div>
+
+          {budgetSignals.length === 0 ? (
+            <p className="empty-state">No budgets yet. Add your first budget for {monthLabel}.</p>
+          ) : null}
+
           {budgetSignals.map((entry) => {
             const statusLabel =
-              entry.tone === 'missing'
-                ? 'No budget'
-                : entry.remaining >= 0
-                  ? `${formatCurrency(entry.remaining, currency)} left`
-                  : `${formatCurrency(Math.abs(entry.remaining), currency)} over`
-            const detailLabel =
-              entry.tone === 'missing'
-                ? entry.spent > 0
-                  ? `Spent ${formatCurrency(entry.spent, currency)} this month`
-                  : 'Tap to set a limit'
-                : `${formatCurrency(entry.spent, currency)} / ${formatCurrency(entry.limit, currency)}`
+              entry.remaining >= 0
+                ? `${formatCurrency(entry.remaining, currency)} left`
+                : `${formatCurrency(Math.abs(entry.remaining), currency)} over`
+            const detailLabel = `${formatCurrency(entry.spent, currency)} / ${formatCurrency(entry.limit, currency)}`
+            const categoriesLabel = entry.categories.map((category) => category.name).join(', ')
 
             return (
               <article
-                key={entry.category.id}
+                key={entry.budget.id}
                 className={`budget-signal-row ${entry.tone}`.trim()}
-                onClick={() => setSelectedCategoryId(entry.category.id)}
+                onClick={() => setEditingBudgetId(entry.budget.id)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
-                    setSelectedCategoryId(entry.category.id)
+                    setEditingBudgetId(entry.budget.id)
                   }
                 }}
                 role="button"
@@ -98,33 +159,24 @@ export function BudgetsScreen() {
               >
                 <div className="budget-signal-head">
                   <div className="budget-signal-name">
-                    <span
-                      className="chip-dot"
-                      style={{ backgroundColor: entry.category.color }}
-                      aria-hidden="true"
-                    />
-                    <strong>{entry.category.name}</strong>
+                    <strong>{entry.budget.name}</strong>
+                    <span className="budget-signal-detail">{categoriesLabel}</span>
                   </div>
 
                   <div className="budget-signal-summary">
                     <strong>{statusLabel}</strong>
-                    {entry.tone === 'missing' ? (
-                      <span className="budget-signal-action">+ Set</span>
-                    ) : null}
                   </div>
                 </div>
 
                 <div className="budget-signal-body">
                   <span className="budget-signal-detail">{detailLabel}</span>
 
-                  {entry.tone !== 'missing' ? (
-                    <div className="progress-track budget-signal-track">
-                      <span
-                        className={entry.tone}
-                        style={{ width: `${entry.progress * 100}%` }}
-                      />
-                    </div>
-                  ) : null}
+                  <div className="progress-track budget-signal-track">
+                    <span
+                      className={entry.tone}
+                      style={{ width: `${entry.progress * 100}%` }}
+                    />
+                  </div>
                 </div>
               </article>
             )
@@ -132,21 +184,29 @@ export function BudgetsScreen() {
         </section>
       )}
 
-      {selectedSignal ? (
+      {editingBudgetId === 'create' || selectedBudget ? (
         <BudgetEditorSheet
-          key={selectedSignal.category.id}
-          category={selectedSignal.category}
-          budget={selectedSignal.budget}
-          spent={selectedSignal.spent}
+          key={editingBudgetId}
+          mode={editingBudgetId === 'create' ? 'create' : 'edit'}
+          budget={selectedBudget}
+          categories={managedExpenseCategories}
+          spent={selectedSignal?.spent ?? 0}
+          allocationSummary={allocationSummary}
           currency={currency}
           monthLabel={monthLabel}
-          onClose={() => setSelectedCategoryId(null)}
-          onSave={(limit: number) =>
-            setBudget({ categoryId: selectedSignal.category.id, monthKey, limit })
+          onClose={() => setEditingBudgetId(null)}
+          onSave={(input) =>
+            upsertBudget({
+              id: input.id,
+              name: input.name,
+              categoryIds: input.categoryIds,
+              monthKey,
+              limit: input.limit,
+            })
           }
-          onRemove={() =>
-            setBudget({ categoryId: selectedSignal.category.id, monthKey, limit: 0 })
-          }
+          onRemove={(budgetId) => {
+            removeBudget(budgetId)
+          }}
         />
       ) : null}
     </div>

@@ -1,15 +1,30 @@
 import type { FinanceState } from './models'
+import {
+  UNCATEGORIZED_CATEGORY_COLOR,
+  UNCATEGORIZED_CATEGORY_ID,
+  UNCATEGORIZED_CATEGORY_NAME,
+} from './categories'
 
 const now = new Date().toISOString()
 
 export const initialFinanceState: FinanceState = {
   categories: [
     {
+      id: UNCATEGORIZED_CATEGORY_ID,
+      name: UNCATEGORIZED_CATEGORY_NAME,
+      color: UNCATEGORIZED_CATEGORY_COLOR,
+      kind: 'both',
+      system: 'uncategorized',
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: 'synced',
+    },
+    {
       id: 'cat-salary',
       name: 'Salary',
       color: '#49d17d',
       kind: 'income',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -19,7 +34,7 @@ export const initialFinanceState: FinanceState = {
       name: 'Freelance',
       color: '#59c6ff',
       kind: 'income',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -29,7 +44,7 @@ export const initialFinanceState: FinanceState = {
       name: 'Food',
       color: '#ff8b5f',
       kind: 'expense',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -39,7 +54,7 @@ export const initialFinanceState: FinanceState = {
       name: 'Transport',
       color: '#4f8bff',
       kind: 'expense',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -49,7 +64,7 @@ export const initialFinanceState: FinanceState = {
       name: 'Housing',
       color: '#a97cff',
       kind: 'expense',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -59,7 +74,7 @@ export const initialFinanceState: FinanceState = {
       name: 'Shopping',
       color: '#ffd24d',
       kind: 'expense',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -69,7 +84,7 @@ export const initialFinanceState: FinanceState = {
       name: 'Fun',
       color: '#ff5f8f',
       kind: 'expense',
-      isDefault: true,
+      system: null,
       createdAt: now,
       updatedAt: now,
       syncStatus: 'synced',
@@ -77,6 +92,7 @@ export const initialFinanceState: FinanceState = {
   ],
   transactions: [],
   budgets: [],
+  recurringTemplates: [],
   syncQueue: [],
   settings: {
     theme: 'dark',

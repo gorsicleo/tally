@@ -1,36 +1,67 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { formatCurrency } from '../../domain/formatters'
+import {
+  previewAvailableToBudgetAfterBudgetChange,
+  type BudgetAllocationSummary,
+} from '../../domain/selectors'
 import type { Budget, Category } from '../../domain/models'
 
 interface BudgetEditorSheetProps {
-  category: Category
+  mode: 'create' | 'edit'
   budget: Budget | null
+  categories: Category[]
   spent: number
+  allocationSummary: BudgetAllocationSummary
   currency: string
   monthLabel: string
   onClose: () => void
-  onSave: (limit: number) => void
-  onRemove: () => void
+  onSave: (input: {
+    id?: string
+    name: string
+    categoryIds: string[]
+    limit: number
+  }) => string | null
+  onRemove: (budgetId: string) => void
 }
 
 const SHEET_CLOSE_MS = 280
 const quickBudgetValues = [100, 200, 500]
 
 export function BudgetEditorSheet({
-  category,
+  mode,
   budget,
+  categories,
   spent,
+  allocationSummary,
   currency,
   monthLabel,
   onClose,
   onSave,
   onRemove,
 }: BudgetEditorSheetProps) {
+  const [name, setName] = useState(budget?.name ?? '')
   const [limit, setLimit] = useState(budget ? String(budget.limit) : '')
+  const [categoryIds, setCategoryIds] = useState<string[]>(budget?.categoryIds ?? [])
   const [error, setError] = useState<string | null>(null)
   const [state, setState] = useState<'opening' | 'open' | 'closing'>('opening')
   const closingRef = useRef(false)
   const closeTimeoutRef = useRef<number | null>(null)
+  const preview = useMemo(() => {
+    const numericLimit = Number(limit)
+
+    return previewAvailableToBudgetAfterBudgetChange({
+      totalIncomeForPeriod: allocationSummary.totalIncomeForPeriod,
+      totalAllocatedBudgetLimitsForPeriod:
+        allocationSummary.totalAllocatedBudgetLimitsForPeriod,
+      draftLimit: Number.isFinite(numericLimit) ? numericLimit : null,
+      previousBudgetLimit: budget?.limit ?? null,
+    })
+  }, [allocationSummary, budget?.limit, limit])
+  const previewLabel = preview
+    ? preview.availableToBudgetForPeriod < 0
+      ? `After this budget: ${formatCurrency(preview.overAllocatedAmountForPeriod, currency)} over-allocated`
+      : `After this budget: ${formatCurrency(Math.max(preview.availableToBudgetForPeriod, 0), currency)} left`
+    : null
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -62,14 +93,36 @@ export function BudgetEditorSheet({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
+    const trimmedName = name.trim()
     const numericLimit = Number(limit)
+
+    if (!trimmedName) {
+      setError('Budget name is required.')
+      return
+    }
 
     if (!Number.isFinite(numericLimit) || numericLimit <= 0) {
       setError('Limit must be greater than zero.')
       return
     }
 
-    onSave(numericLimit)
+    if (categoryIds.length === 0) {
+      setError('Select at least one category.')
+      return
+    }
+
+    const nextError = onSave({
+      id: budget?.id,
+      name: trimmedName,
+      categoryIds,
+      limit: numericLimit,
+    })
+
+    if (nextError) {
+      setError(nextError)
+      return
+    }
+
     requestClose()
   }
 
@@ -78,9 +131,24 @@ export function BudgetEditorSheet({
       return
     }
 
+    const confirmed = window.confirm(`Remove budget ${budget.name}?`)
+
+    if (!confirmed) {
+      return
+    }
+
     requestClose(() => {
-      onRemove()
+      onRemove(budget.id)
     })
+  }
+
+  const toggleCategory = (categoryId: string) => {
+    setCategoryIds((current) =>
+      current.includes(categoryId)
+        ? current.filter((entry) => entry !== categoryId)
+        : [...current, categoryId],
+    )
+    setError(null)
   }
 
   return (
@@ -103,7 +171,9 @@ export function BudgetEditorSheet({
         <div className="sheet-header">
           <div>
             <p className="eyebrow">Budget</p>
-            <h3 id="budget-sheet-title">{category.name}</h3>
+            <h3 id="budget-sheet-title">
+              {mode === 'edit' ? 'Update budget' : 'Create budget'}
+            </h3>
             <p>{monthLabel}</p>
           </div>
 
@@ -131,6 +201,21 @@ export function BudgetEditorSheet({
 
         <form className="field-grid" onSubmit={handleSubmit}>
           <label>
+            Budget name
+            <input
+              type="text"
+              maxLength={48}
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value)
+                setError(null)
+              }}
+              placeholder="Essentials"
+              required
+            />
+          </label>
+
+          <label>
             Monthly limit
             <input
               type="number"
@@ -145,6 +230,43 @@ export function BudgetEditorSheet({
               placeholder="0.00"
             />
           </label>
+
+          {previewLabel ? (
+            <p className="support-copy budget-allocation-preview">{previewLabel}</p>
+          ) : null}
+
+          <fieldset className="budget-category-fieldset">
+            <legend>Categories</legend>
+
+            {categories.length === 0 ? (
+              <p className="support-copy">No expense categories are available.</p>
+            ) : (
+              <div className="budget-category-grid" role="group" aria-label="Budget categories">
+                {categories.map((category) => {
+                  const active = categoryIds.includes(category.id)
+
+                  return (
+                    <label
+                      key={category.id}
+                      className={`budget-category-pill ${active ? 'active' : ''}`.trim()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={active}
+                        onChange={() => toggleCategory(category.id)}
+                      />
+                      <span
+                        className="chip-dot"
+                        aria-hidden="true"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <span>{category.name}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </fieldset>
 
           <div className="budget-quick-values" role="group" aria-label="Quick budget values">
             {quickBudgetValues.map((value) => (

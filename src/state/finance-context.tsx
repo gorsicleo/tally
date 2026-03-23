@@ -8,16 +8,28 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { initialFinanceState } from '../domain/default-data'
+import { validateBudgetCategoryIds } from '../domain/budget-service'
+import {
+  computeCategoryDeletionPlan,
+  type CategoryDeletionPlanInput,
+} from '../domain/category-service'
+import {
+  advanceRecurringNextDueDate,
+  getProcessibleRecurringDates,
+  isRecurringIntervalValid,
+} from '../domain/recurring'
 import type { BackupPreferences, ThemeMode } from '../domain/models'
 import { loadFinanceState, saveFinanceState } from '../persistence/finance-storage'
-import { pushSyncQueue } from '../sync/client'
 import { createId } from '../utils/id'
 import { financeReducer } from './finance-reducer'
 import {
   FinanceContext,
   type AddCategoryInput,
+  type AddRecurringTemplateInput,
   type AddTransactionInput,
-  type SetBudgetInput,
+  type ApplyRecurringOccurrencesInput,
+  type UpsertBudgetInput,
+  type UpdateRecurringTemplateInput,
   type UpdateCategoryInput,
   type UpdateTransactionInput,
 } from './finance-store'
@@ -33,7 +45,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     return navigator.onLine
   })
   const [isSyncing, setIsSyncing] = useState(false)
-  const hasAttemptedInitialSync = useRef(false)
   const stateRef = useRef(state)
 
   useEffect(() => {
@@ -71,8 +82,45 @@ export function FinanceProvider({ children }: PropsWithChildren) {
   }, [isLoaded, state])
 
   useEffect(() => {
-    document.documentElement.dataset.theme = state.settings.theme
-    document.documentElement.style.colorScheme = state.settings.theme
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const root = document.documentElement
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const resolveTheme = () =>
+      state.settings.theme === 'auto'
+        ? media.matches
+          ? 'dark'
+          : 'light'
+        : state.settings.theme
+    const applyTheme = () => {
+      const resolvedTheme = resolveTheme()
+      root.dataset.theme = resolvedTheme
+      root.style.colorScheme = resolvedTheme
+    }
+
+    applyTheme()
+
+    if (state.settings.theme !== 'auto') {
+      return
+    }
+
+    const handleChange = () => {
+      applyTheme()
+    }
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange)
+      return () => {
+        media.removeEventListener('change', handleChange)
+      }
+    }
+
+    media.addListener(handleChange)
+    return () => {
+      media.removeListener(handleChange)
+    }
   }, [state.settings.theme])
 
   useEffect(() => {
@@ -103,7 +151,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         name: input.name.trim(),
         color: input.color,
         kind: input.kind,
-        isDefault: false,
+        system: null,
         createdAt: timestamp,
         updatedAt: timestamp,
         syncStatus: 'pending',
@@ -133,8 +181,28 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
-  const deleteCategory = useCallback((categoryId: string) => {
-    dispatch({ type: 'delete-category', payload: { id: categoryId } })
+  const previewCategoryDeletion = useCallback(
+    (input: CategoryDeletionPlanInput) =>
+      computeCategoryDeletionPlan(stateRef.current, input),
+    [],
+  )
+
+  const deleteCategory = useCallback((input: CategoryDeletionPlanInput) => {
+    const planResult = computeCategoryDeletionPlan(stateRef.current, input)
+
+    if (!planResult.ok) {
+      return planResult.message
+    }
+
+    dispatch({
+      type: 'delete-category',
+      payload: {
+        plan: planResult.plan,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    return null
   }, [])
 
   const addTransaction = useCallback((input: AddTransactionInput) => {
@@ -149,6 +217,8 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         categoryId: input.categoryId,
         note: input.note.trim(),
         occurredAt: input.occurredAt,
+        recurringTemplateId: input.recurringTemplateId ?? null,
+        recurringOccurrenceDate: input.recurringOccurrenceDate ?? null,
         createdAt: timestamp,
         updatedAt: timestamp,
         syncStatus: 'pending',
@@ -174,6 +244,12 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         categoryId: input.categoryId,
         note: input.note.trim(),
         occurredAt: input.occurredAt,
+        recurringTemplateId:
+          input.recurringTemplateId ?? existingTransaction.recurringTemplateId ?? null,
+        recurringOccurrenceDate:
+          input.recurringOccurrenceDate ??
+          existingTransaction.recurringOccurrenceDate ??
+          null,
         updatedAt: new Date().toISOString(),
         syncStatus: 'pending',
       },
@@ -184,19 +260,207 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'delete-transaction', payload: { id: transactionId } })
   }, [])
 
-  const setBudget = useCallback((input: SetBudgetInput) => {
-    const budgetId = `budget-${input.categoryId}-${input.monthKey}`
-    const existingBudget = stateRef.current.budgets.find(
-      (budget) => budget.id === budgetId,
+  const addRecurringTemplate = useCallback(
+    (input: AddRecurringTemplateInput) => {
+      const category = stateRef.current.categories.find(
+        (entry) => entry.id === input.categoryId,
+      )
+
+      if (
+        !category ||
+        (category.kind !== 'both' && category.kind !== input.type) ||
+        input.amount <= 0 ||
+        !isRecurringIntervalValid(input.frequency, input.intervalDays)
+      ) {
+        return null
+      }
+
+      const timestamp = new Date().toISOString()
+      const recurringTemplateId = createId('rec')
+
+      dispatch({
+        type: 'add-recurring-template',
+        payload: {
+          id: recurringTemplateId,
+          type: input.type,
+          amount: Math.abs(input.amount),
+          categoryId: input.categoryId,
+          note: input.note.trim(),
+          frequency: input.frequency,
+          intervalDays:
+            input.frequency === 'custom'
+              ? Math.floor(input.intervalDays ?? 1)
+              : null,
+          startDate: input.startDate,
+          nextDueDate: input.nextDueDate,
+          active: true,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          syncStatus: 'synced',
+        },
+      })
+
+      return recurringTemplateId
+    },
+    [],
+  )
+
+  const updateRecurringTemplate = useCallback((input: UpdateRecurringTemplateInput) => {
+    const existingTemplate = stateRef.current.recurringTemplates.find(
+      (template) => template.id === input.id,
     )
 
-    if (input.limit <= 0) {
-      if (!existingBudget) {
+    if (!existingTemplate || !isRecurringIntervalValid(input.frequency, input.intervalDays)) {
+      return
+    }
+
+    dispatch({
+      type: 'update-recurring-template',
+      payload: {
+        ...existingTemplate,
+        type: input.type,
+        amount: Math.abs(input.amount),
+        categoryId: input.categoryId,
+        note: input.note.trim(),
+        frequency: input.frequency,
+        intervalDays:
+          input.frequency === 'custom'
+            ? Math.floor(input.intervalDays ?? 1)
+            : null,
+        startDate: input.startDate,
+        nextDueDate: input.nextDueDate,
+        active: true,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+  }, [])
+
+  const stopRecurringTemplate = useCallback((templateId: string) => {
+    dispatch({
+      type: 'stop-recurring-template',
+      payload: {
+        id: templateId,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+  }, [])
+
+  const addRecurringOccurrences = useCallback(
+    (input: ApplyRecurringOccurrencesInput) => {
+      const template = stateRef.current.recurringTemplates.find(
+        (entry) => entry.id === input.templateId,
+      )
+
+      if (!template) {
         return
       }
 
-      dispatch({ type: 'remove-budget', payload: { id: budgetId } })
-      return
+      const processibleDates = getProcessibleRecurringDates(
+        template,
+        input.occurrenceDates,
+      )
+
+      if (processibleDates.length === 0) {
+        return
+      }
+
+      const timestamp = new Date().toISOString()
+
+      dispatch({
+        type: 'add-recurring-occurrences',
+        payload: {
+          templateId: template.id,
+          transactions: processibleDates.map((occurrenceDate) => ({
+            id: createId('txn'),
+            type: template.type,
+            amount: template.amount,
+            categoryId: template.categoryId,
+            note: template.note,
+            occurredAt: occurrenceDate,
+            recurringTemplateId: template.id,
+            recurringOccurrenceDate: occurrenceDate,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            syncStatus: 'pending',
+          })),
+          nextDueDate: advanceRecurringNextDueDate(
+            template,
+            processibleDates.length,
+          ),
+          updatedAt: timestamp,
+        },
+      })
+    },
+    [],
+  )
+
+  const skipRecurringOccurrences = useCallback(
+    (input: ApplyRecurringOccurrencesInput) => {
+      const template = stateRef.current.recurringTemplates.find(
+        (entry) => entry.id === input.templateId,
+      )
+
+      if (!template) {
+        return
+      }
+
+      const processibleDates = getProcessibleRecurringDates(
+        template,
+        input.occurrenceDates,
+      )
+
+      if (processibleDates.length === 0) {
+        return
+      }
+
+      dispatch({
+        type: 'skip-recurring-occurrences',
+        payload: {
+          templateId: template.id,
+          nextDueDate: advanceRecurringNextDueDate(
+            template,
+            processibleDates.length,
+          ),
+          updatedAt: new Date().toISOString(),
+        },
+      })
+    },
+    [],
+  )
+
+  const upsertBudget = useCallback((input: UpsertBudgetInput) => {
+    const trimmedName = input.name.trim()
+
+    if (!trimmedName) {
+      return 'Budget name is required.'
+    }
+
+    if (!Number.isFinite(input.limit) || input.limit <= 0) {
+      return 'Budget limit must be greater than zero.'
+    }
+
+    const categoryIds = validateBudgetCategoryIds(
+      input.categoryIds,
+      stateRef.current.categories,
+    )
+
+    if (categoryIds.length === 0) {
+      return 'Select at least one expense category.'
+    }
+
+    const existingBudget = input.id
+      ? stateRef.current.budgets.find((budget) => budget.id === input.id) ?? null
+      : null
+    const normalizedName = trimmedName.toLowerCase()
+    const duplicateName = stateRef.current.budgets.some(
+      (budget) =>
+        budget.id !== existingBudget?.id &&
+        budget.monthKey === input.monthKey &&
+        budget.name.trim().toLowerCase() === normalizedName,
+    )
+
+    if (duplicateName) {
+      return 'A budget with this name already exists for this month.'
     }
 
     const timestamp = new Date().toISOString()
@@ -204,8 +468,9 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     dispatch({
       type: 'set-budget',
       payload: {
-        id: budgetId,
-        categoryId: input.categoryId,
+        id: existingBudget?.id ?? createId('budget'),
+        name: trimmedName,
+        categoryIds,
         monthKey: input.monthKey,
         limit: input.limit,
         createdAt: existingBudget?.createdAt ?? timestamp,
@@ -213,6 +478,12 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         syncStatus: 'pending',
       },
     })
+
+    return null
+  }, [])
+
+  const removeBudget = useCallback((budgetId: string) => {
+    dispatch({ type: 'remove-budget', payload: { id: budgetId } })
   }, [])
 
   const setTheme = useCallback((theme: ThemeMode) => {
@@ -247,79 +518,44 @@ export function FinanceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const syncNow = useCallback(async () => {
-    if (isSyncing || !isOnline) {
+    if (isSyncing) {
       return false
     }
 
     const currentState = stateRef.current
-    const syncAttemptAt = new Date().toISOString()
+    const synchronizedAt = new Date().toISOString()
 
-    dispatch({ type: 'sync-attempt', payload: { at: syncAttemptAt } })
+    dispatch({ type: 'sync-attempt', payload: { at: synchronizedAt } })
 
     if (currentState.syncQueue.length === 0) {
-      dispatch({ type: 'sync-success', payload: { at: syncAttemptAt, operationIds: [] } })
+      dispatch({ type: 'sync-success', payload: { at: synchronizedAt, operationIds: [] } })
       return true
     }
 
     setIsSyncing(true)
 
     try {
-      const response = await pushSyncQueue(
-        currentState.settings.syncEndpoint,
-        currentState.syncQueue,
-        currentState.settings.conflictPolicy,
-      )
-
       dispatch({
         type: 'sync-success',
         payload: {
-          at: response.serverTimestamp,
-          operationIds: response.appliedOperationIds,
+          at: synchronizedAt,
+          operationIds: currentState.syncQueue.map((operation) => operation.id),
         },
       })
 
       return true
-    } catch (error) {
-      dispatch({
-        type: 'sync-failure',
-        payload: {
-          at: syncAttemptAt,
-          operationIds: currentState.syncQueue.map((operation) => operation.id),
-          error:
-            error instanceof Error ? error.message : 'Sync failed unexpectedly.',
-        },
-      })
-
-      return false
     } finally {
       setIsSyncing(false)
     }
-  }, [isOnline, isSyncing])
+  }, [isSyncing])
 
   useEffect(() => {
-    if (!isLoaded || !isOnline || hasAttemptedInitialSync.current) {
+    if (!isLoaded || state.syncQueue.length === 0) {
       return
     }
 
-    hasAttemptedInitialSync.current = true
     void syncNow()
-  }, [isLoaded, isOnline, syncNow])
-
-  useEffect(() => {
-    if (!isLoaded) {
-      return
-    }
-
-    const handleOnlineSync = () => {
-      void syncNow()
-    }
-
-    window.addEventListener('online', handleOnlineSync)
-
-    return () => {
-      window.removeEventListener('online', handleOnlineSync)
-    }
-  }, [isLoaded, syncNow])
+  }, [isLoaded, state.syncQueue.length, syncNow])
 
   const value = useMemo(
     () => ({
@@ -329,11 +565,18 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       isSyncing,
       addCategory,
       updateCategory,
+      previewCategoryDeletion,
       deleteCategory,
       addTransaction,
       updateTransaction,
       deleteTransaction,
-      setBudget,
+      addRecurringTemplate,
+      updateRecurringTemplate,
+      stopRecurringTemplate,
+      addRecurringOccurrences,
+      skipRecurringOccurrences,
+      upsertBudget,
+      removeBudget,
       setTheme,
       setCurrency,
       setSyncEndpoint,
@@ -348,11 +591,18 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       isSyncing,
       addCategory,
       updateCategory,
+      previewCategoryDeletion,
       deleteCategory,
       addTransaction,
       updateTransaction,
       deleteTransaction,
-      setBudget,
+      addRecurringTemplate,
+      updateRecurringTemplate,
+      stopRecurringTemplate,
+      addRecurringOccurrences,
+      skipRecurringOccurrences,
+      upsertBudget,
+      removeBudget,
       setTheme,
       setCurrency,
       setSyncEndpoint,

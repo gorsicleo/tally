@@ -1,5 +1,5 @@
 import type { FinanceState } from '../domain/models'
-import { isFinanceState } from '../domain/validation'
+import { parsePersistedFinanceState } from '../domain/validation'
 import {
   BACKUP_APP_NAME,
   BACKUP_SCHEMA_VERSION,
@@ -7,6 +7,8 @@ import {
   type PreparedBackupRestoreResult,
   type TallyBackupPayload,
 } from './backup-models'
+
+type SupportedBackupSchemaVersion = 1 | typeof BACKUP_SCHEMA_VERSION
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -25,6 +27,7 @@ function buildRestoredState(payload: TallyBackupPayload): FinanceState {
     categories: cloneItems(payload.data.categories),
     transactions: cloneItems(payload.data.transactions),
     budgets: cloneItems(payload.data.budgets),
+    recurringTemplates: cloneItems(payload.data.recurringTemplates),
     syncQueue: [],
     settings: {
       ...payload.data.preferences,
@@ -38,12 +41,18 @@ function buildRestoredState(payload: TallyBackupPayload): FinanceState {
   }
 }
 
+function isSupportedBackupSchemaVersion(
+  value: unknown,
+): value is SupportedBackupSchemaVersion {
+  return value === 1 || value === BACKUP_SCHEMA_VERSION
+}
+
 export function validateBackupPayload(value: unknown): BackupParseResult {
   if (!isRecord(value)) {
     return { ok: false, message: 'This backup file is not valid.' }
   }
 
-  if (value.schemaVersion !== BACKUP_SCHEMA_VERSION) {
+  if (!isSupportedBackupSchemaVersion(value.schemaVersion)) {
     return {
       ok: false,
       message: 'This backup file uses an unsupported version.',
@@ -63,23 +72,43 @@ export function validateBackupPayload(value: unknown): BackupParseResult {
     return { ok: false, message: 'This backup file is not valid.' }
   }
 
+  if (
+    value.schemaVersion === BACKUP_SCHEMA_VERSION &&
+    !Array.isArray(value.data.recurringTemplates)
+  ) {
+    return { ok: false, message: 'This backup file is not valid.' }
+  }
+
+  const candidateState = parsePersistedFinanceState({
+    categories: value.data.categories,
+    transactions: value.data.transactions,
+    budgets: value.data.budgets,
+    recurringTemplates:
+      value.schemaVersion === BACKUP_SCHEMA_VERSION
+        ? value.data.recurringTemplates
+        : [],
+    syncQueue: [],
+    settings: value.data.preferences,
+    lastSyncedAt: null,
+    lastSyncAttemptAt: null,
+    lastSyncError: null,
+  })
+
+  if (!candidateState) {
+    return { ok: false, message: 'This backup file is not valid.' }
+  }
+
   const payload: TallyBackupPayload = {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     exportedAt: value.exportedAt,
     app: BACKUP_APP_NAME,
     data: {
-      transactions: value.data.transactions,
-      categories: value.data.categories,
-      budgets: value.data.budgets,
-      preferences:
-        value.data.preferences as unknown as TallyBackupPayload['data']['preferences'],
+      transactions: cloneItems(candidateState.transactions),
+      categories: cloneItems(candidateState.categories),
+      budgets: cloneItems(candidateState.budgets),
+      recurringTemplates: cloneItems(candidateState.recurringTemplates),
+      preferences: { ...candidateState.settings },
     },
-  }
-
-  const candidateState = buildRestoredState(payload)
-
-  if (!isFinanceState(candidateState)) {
-    return { ok: false, message: 'This backup file is not valid.' }
   }
 
   return { ok: true, payload }

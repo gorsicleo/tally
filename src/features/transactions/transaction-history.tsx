@@ -8,6 +8,8 @@ import type { Category, Transaction } from '../../domain/models'
 import { getTodayLocalDate, shiftLocalDateKey } from '../../utils/date'
 
 interface TransactionHistoryProps {
+  title?: string
+  embedInPanel?: boolean
   categories: Category[]
   transactions: Transaction[]
   currency: string
@@ -37,6 +39,8 @@ function getGroupLabel(isoDate: string): string {
 }
 
 export function TransactionHistory({
+  title,
+  embedInPanel = false,
   categories,
   transactions,
   currency,
@@ -69,17 +73,11 @@ export function TransactionHistory({
     return [...groupedTransactions.values()]
   }, [transactions])
 
-  if (groups.length === 0) {
-    return (
-      <article className="panel transaction-panel">
-        <p className="empty-state">
-          {emptyMessage ?? 'No records match this filter yet.'}
-        </p>
-      </article>
-    )
-  }
-
-  return (
+  const content = groups.length === 0 ? (
+    <p className="empty-state">
+      {emptyMessage ?? 'No records match this filter yet.'}
+    </p>
+  ) : (
     <div className="history-groups">
       {groups.map((group) => (
         <section className="history-group" key={group.key}>
@@ -96,10 +94,8 @@ export function TransactionHistory({
                 metaBits.unshift(category.name)
               }
 
-              if (transaction.syncStatus !== 'synced') {
-                metaBits.push(
-                  transaction.syncStatus === 'pending' ? 'Pending' : 'Failed',
-                )
+              if (transaction.recurringTemplateId) {
+                metaBits.push('Recurring')
               }
 
               return (
@@ -123,14 +119,7 @@ export function TransactionHistory({
 
                     <div className="transaction-meta compact-meta">
                       {metaBits.map((bit, index) => (
-                        <span
-                          key={`${transaction.id}-${bit}-${index}`}
-                          className={
-                            bit === 'Pending' || bit === 'Failed'
-                              ? `transaction-status-text ${transaction.syncStatus}`
-                              : undefined
-                          }
-                        >
+                          <span key={`${transaction.id}-${bit}-${index}`}>
                           {index > 0 ? (
                             <span className="transaction-meta-separator" aria-hidden="true">
                               •
@@ -156,4 +145,23 @@ export function TransactionHistory({
       ))}
     </div>
   )
+
+  if (embedInPanel) {
+    return (
+      <article className="panel transaction-panel">
+        {title ? <h3>{title}</h3> : null}
+        {content}
+      </article>
+    )
+  }
+
+  if (groups.length === 0) {
+    return (
+      <article className="panel transaction-panel">
+        {content}
+      </article>
+    )
+  }
+
+  return content
 }

@@ -3,16 +3,18 @@ import type {
   Budget,
   Category,
   FinanceState,
+  RecurringTemplate,
   Transaction,
 } from '../domain/models'
 
-export const BACKUP_SCHEMA_VERSION = 1 as const
+export const BACKUP_SCHEMA_VERSION = 2 as const
 export const BACKUP_APP_NAME = 'Tally' as const
 
 export interface BackupPayloadData {
   transactions: Transaction[]
   categories: Category[]
   budgets: Budget[]
+  recurringTemplates: RecurringTemplate[]
   preferences: AppSettings
 }
 

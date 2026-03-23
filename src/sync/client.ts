@@ -68,27 +68,14 @@ export async function pushSyncQueue(
     operations,
   }
 
-  if (endpoint === 'demo://local') {
-    return {
-      appliedOperationIds: operations.map((operation) => operation.id),
-      serverTimestamp: new Date().toISOString(),
-      conflicts: [],
-    }
+  // Remote sync is intentionally disabled for now; local state remains source of truth.
+  void endpoint
+
+  const payload: unknown = {
+    appliedOperationIds: requestBody.operations.map((operation) => operation.id),
+    serverTimestamp: new Date().toISOString(),
+    conflicts: [],
   }
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Sync request failed with status ${response.status}.`)
-  }
-
-  const payload: unknown = await response.json()
 
   if (!isSyncResponse(payload)) {
     throw new Error('Sync response payload was invalid.')

@@ -3,7 +3,6 @@ import { useState } from 'react'
 interface PrivacyFirstModalProps {
   initialRemindersEnabled: boolean
   onContinue: (remindersEnabled: boolean) => Promise<void> | void
-  onCreateBackup: (remindersEnabled: boolean) => Promise<void> | void
 }
 
 interface BackupReminderCardProps {
@@ -22,7 +21,6 @@ interface RestoreBackupDialogProps {
 export function PrivacyFirstModal({
   initialRemindersEnabled,
   onContinue,
-  onCreateBackup,
 }: PrivacyFirstModalProps) {
   const [remindersEnabled, setRemindersEnabled] = useState(initialRemindersEnabled)
   const [isBusy, setIsBusy] = useState(false)
@@ -56,7 +54,9 @@ export function PrivacyFirstModal({
             you export a backup.
           </p>
           <p>Create backups regularly to protect your data.</p>
-          <p>Clearing browser or app data can remove the records kept here.</p>
+            <p>
+              <strong>Clearing browser or app data can remove the records kept here.</strong>
+            </p>
         </div>
 
         <label className="backup-checkbox-row">
@@ -71,24 +71,13 @@ export function PrivacyFirstModal({
         <div className="backup-modal-actions">
           <button
             type="button"
-            className="ghost-button"
-            onClick={() => {
-              void runAction(onCreateBackup)
-            }}
-            disabled={isBusy}
-          >
-            Create first backup
-          </button>
-
-          <button
-            type="button"
             className="submit-button"
             onClick={() => {
               void runAction(onContinue)
             }}
             disabled={isBusy}
           >
-            {isBusy ? 'Working...' : 'Continue'}
+              {isBusy ? 'Working...' : 'I understand'}
           </button>
         </div>
       </section>

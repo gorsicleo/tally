@@ -1,10 +1,12 @@
 export type TransactionType = 'income' | 'expense'
-export type ThemeMode = 'dark' | 'light'
+export type ThemeMode = 'dark' | 'light' | 'auto'
 export type SyncStatus = 'synced' | 'pending' | 'failed'
 export type CategoryKind = TransactionType | 'both'
 export type SyncEntityType = 'transaction' | 'category' | 'budget'
 export type SyncAction = 'upsert' | 'delete'
 export type ConflictPolicy = 'client-wins'
+export type RecurringFrequency = 'monthly' | 'custom'
+export type CategorySystem = 'uncategorized' | null
 
 export interface BackupPreferences {
   hasSeenPrivacyModal: boolean
@@ -25,7 +27,7 @@ export interface Category extends BaseEntity {
   name: string
   color: string
   kind: CategoryKind
-  isDefault: boolean
+  system: CategorySystem
 }
 
 export interface Transaction extends BaseEntity {
@@ -35,12 +37,27 @@ export interface Transaction extends BaseEntity {
   categoryId: string
   note: string
   occurredAt: string
+  recurringTemplateId: string | null
+  recurringOccurrenceDate: string | null
 }
 
 export interface Budget extends BaseEntity {
-  categoryId: string
+  name: string
+  categoryIds: string[]
   monthKey: string
   limit: number
+}
+
+export interface RecurringTemplate extends BaseEntity {
+  type: TransactionType
+  amount: number
+  categoryId: string
+  note: string
+  frequency: RecurringFrequency
+  intervalDays: number | null
+  startDate: string
+  nextDueDate: string
+  active: boolean
 }
 
 export interface SyncQueueItem {
@@ -64,6 +81,7 @@ export interface FinanceState {
   categories: Category[]
   transactions: Transaction[]
   budgets: Budget[]
+  recurringTemplates: RecurringTemplate[]
   syncQueue: SyncQueueItem[]
   settings: AppSettings
   lastSyncedAt: string | null

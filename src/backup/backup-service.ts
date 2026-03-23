@@ -1,11 +1,7 @@
 import type { BackupPreferences, FinanceState } from '../domain/models'
 import { toLocalDateKey } from '../utils/date'
 import { downloadTextFile } from '../utils/download'
-import {
-  BACKUP_APP_NAME,
-  BACKUP_SCHEMA_VERSION,
-  type TallyBackupPayload,
-} from './backup-models'
+import { BACKUP_APP_NAME, BACKUP_SCHEMA_VERSION, type TallyBackupPayload } from './backup-models'
 
 export type BackupDownloadResult =
   | { ok: true; exportedAt: string; fileName: string }
@@ -42,6 +38,7 @@ export function buildBackupPayload(
       transactions: cloneItems(state.transactions),
       categories: cloneItems(state.categories),
       budgets: cloneItems(state.budgets),
+      recurringTemplates: cloneItems(state.recurringTemplates),
       preferences: buildExportSettings(state, exportedAt, settingsPatch),
     },
   }

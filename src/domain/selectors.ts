@@ -5,6 +5,7 @@ import type {
   Transaction,
   TransactionType,
 } from './models'
+import { computeBudgetSpending } from './budget-service'
 
 export interface OverviewTotals {
   balance: number
@@ -20,16 +21,40 @@ export interface CategoryTotal {
   count: number
 }
 
-export type BudgetTone = 'danger' | 'warning' | 'safe' | 'missing'
+export type BudgetTone = 'danger' | 'warning' | 'safe'
 
 export interface BudgetSignal {
-  budget: Budget | null
-  category: Category
+  budget: Budget
+  categories: Category[]
   spent: number
   limit: number
   remaining: number
   progress: number
   tone: BudgetTone
+}
+
+export interface BudgetAllocationSummary {
+  monthKey: string
+  totalIncomeForPeriod: number
+  totalAllocatedBudgetLimitsForPeriod: number
+  availableToBudgetForPeriod: number
+  overAllocatedAmountForPeriod: number
+  hasIncomeRecorded: boolean
+  hasAllocatedBudgets: boolean
+}
+
+export interface BudgetAllocationPreviewInput {
+  totalIncomeForPeriod: number
+  totalAllocatedBudgetLimitsForPeriod: number
+  draftLimit: number | null
+  previousBudgetLimit?: number | null
+}
+
+export interface BudgetAllocationPreview {
+  totalIncomeForPeriod: number
+  totalAllocatedBudgetLimitsForPeriod: number
+  availableToBudgetForPeriod: number
+  overAllocatedAmountForPeriod: number
 }
 
 export interface MonthlyTrendPoint extends OverviewTotals {
@@ -112,7 +137,7 @@ function buildCategoryTotals(
 
 function getBudgetTone(limit: number, spent: number): BudgetTone {
   if (limit <= 0) {
-    return 'missing'
+    return 'danger'
   }
 
   const progress = spent / limit
@@ -127,6 +152,10 @@ function getBudgetTone(limit: number, spent: number): BudgetTone {
   }
 
   return 'safe'
+}
+
+function isBudgetActive(budget: Budget): boolean {
+  return (budget as Budget & { active?: boolean }).active !== false
 }
 
 export function getOverviewForTransactions(
@@ -226,30 +255,26 @@ export function getBudgetSignals(
   state: FinanceState,
   monthKey: string,
 ) : BudgetSignal[] {
-  const budgetsByCategoryId = new Map(
-    state.budgets
-      .filter((budget) => budget.monthKey === monthKey)
-      .map((budget) => [budget.categoryId, budget]),
-  )
-  const spentByCategoryId = new Map(
-    getCategoryTotals(state, monthKey, 'expense').map((entry) => [
-      entry.categoryId,
-      entry.total,
-    ]),
+  const categoriesById = new Map(
+    state.categories.map((category) => [category.id, category]),
   )
 
-  return state.categories
-    .filter((category) => category.kind !== 'income')
-    .map((category) => {
-      const budget = budgetsByCategoryId.get(category.id) ?? null
-      const spent = spentByCategoryId.get(category.id) ?? 0
-      const limit = budget?.limit ?? 0
+  return state.budgets
+    .filter((budget) => budget.monthKey === monthKey && isBudgetActive(budget))
+    .map((budget) => {
+      const categories = budget.categoryIds
+        .map((categoryId) => categoriesById.get(categoryId) ?? null)
+        .filter((category): category is Category =>
+          Boolean(category && category.kind !== 'income'),
+        )
+      const spent = computeBudgetSpending(budget, state.transactions)
+      const limit = budget.limit
       const remaining = limit - spent
       const progress = limit > 0 ? Math.min(spent / limit, 1.25) : 0
 
       return {
         budget,
-        category,
+        categories,
         spent,
         limit,
         remaining,
@@ -257,20 +282,13 @@ export function getBudgetSignals(
         tone: getBudgetTone(limit, spent),
       }
     })
+    .filter((entry) => entry.categories.length > 0)
     .sort((left, right) => {
-      const toneOrder = { danger: 0, warning: 1, safe: 2, missing: 3 }
+      const toneOrder = { danger: 0, warning: 1, safe: 2 }
       const toneDifference = toneOrder[left.tone] - toneOrder[right.tone]
 
       if (toneDifference !== 0) {
         return toneDifference
-      }
-
-      if (left.tone === 'missing' && right.tone === 'missing') {
-        if (right.spent !== left.spent) {
-          return right.spent - left.spent
-        }
-
-        return left.category.name.localeCompare(right.category.name)
       }
 
       if (right.progress !== left.progress) {
@@ -281,8 +299,98 @@ export function getBudgetSignals(
         return right.spent - left.spent
       }
 
-      return left.category.name.localeCompare(right.category.name)
+      return left.budget.name.localeCompare(right.budget.name)
     })
+}
+
+export function getTotalIncomeForPeriod(
+  state: FinanceState,
+  monthKey: string,
+): number {
+  return getTransactionsForMonthKeys(state, [monthKey]).reduce((sum, transaction) => {
+    if (transaction.type !== 'income') {
+      return sum
+    }
+
+    return sum + Math.abs(transaction.amount)
+  }, 0)
+}
+
+export function getTotalAllocatedBudgetLimitsForPeriod(
+  state: FinanceState,
+  monthKey: string,
+): number {
+  return state.budgets.reduce((sum, budget) => {
+    if (budget.monthKey !== monthKey || !isBudgetActive(budget)) {
+      return sum
+    }
+
+    return sum + Math.max(0, budget.limit)
+  }, 0)
+}
+
+export function getAvailableToBudgetForPeriod(
+  state: FinanceState,
+  monthKey: string,
+): number {
+  return (
+    getTotalIncomeForPeriod(state, monthKey) -
+    getTotalAllocatedBudgetLimitsForPeriod(state, monthKey)
+  )
+}
+
+export function getOverAllocatedAmountForPeriod(
+  state: FinanceState,
+  monthKey: string,
+): number {
+  return Math.max(0, -getAvailableToBudgetForPeriod(state, monthKey))
+}
+
+export function getBudgetAllocationSummary(
+  state: FinanceState,
+  monthKey: string,
+): BudgetAllocationSummary {
+  const totalIncomeForPeriod = getTotalIncomeForPeriod(state, monthKey)
+  const totalAllocatedBudgetLimitsForPeriod =
+    getTotalAllocatedBudgetLimitsForPeriod(state, monthKey)
+  const availableToBudgetForPeriod =
+    totalIncomeForPeriod - totalAllocatedBudgetLimitsForPeriod
+
+  return {
+    monthKey,
+    totalIncomeForPeriod,
+    totalAllocatedBudgetLimitsForPeriod,
+    availableToBudgetForPeriod,
+    overAllocatedAmountForPeriod: Math.max(0, -availableToBudgetForPeriod),
+    hasIncomeRecorded: totalIncomeForPeriod > 0,
+    hasAllocatedBudgets: totalAllocatedBudgetLimitsForPeriod > 0,
+  }
+}
+
+export function previewAvailableToBudgetAfterBudgetChange(
+  input: BudgetAllocationPreviewInput,
+): BudgetAllocationPreview | null {
+  if (
+    input.draftLimit === null ||
+    !Number.isFinite(input.draftLimit) ||
+    input.draftLimit <= 0
+  ) {
+    return null
+  }
+
+  const nextAllocatedTotal =
+    input.totalAllocatedBudgetLimitsForPeriod -
+    Math.max(0, input.previousBudgetLimit ?? 0) +
+    input.draftLimit
+  const availableToBudgetForPeriod =
+    input.totalIncomeForPeriod - nextAllocatedTotal
+
+  return {
+    totalIncomeForPeriod: input.totalIncomeForPeriod,
+    totalAllocatedBudgetLimitsForPeriod: nextAllocatedTotal,
+    availableToBudgetForPeriod,
+    overAllocatedAmountForPeriod: Math.max(0, -availableToBudgetForPeriod),
+  }
 }
 
 export function getComparisonOverview(

@@ -8,18 +8,23 @@ import {
   getRecentTransactions,
 } from '../../domain/selectors'
 import type { Transaction } from '../../domain/models'
+import { RecurringDueSection } from '../recurring/recurring-due-section'
 import { useFinance } from '../../state/use-finance'
-import { TransactionList } from '../transactions/transaction-list'
+import { TransactionHistory } from '../transactions/transaction-history'
 import type { AppTab } from '../shell/tab-bar'
 
 interface HomeScreenProps {
   onNavigate: (tab: AppTab) => void
   onEditTransaction: (transaction: Transaction) => void
+  onEditRecurring: (templateId: string) => void
+  onShowToast: (message: string) => void
 }
 
 export function HomeScreen({
   onNavigate,
   onEditTransaction,
+  onEditRecurring,
+  onShowToast,
 }: HomeScreenProps) {
   const { state } = useFinance()
   const monthKey = useMemo(() => getMonthKey(), [])
@@ -76,14 +81,21 @@ export function HomeScreen({
         </div>
       </section>
 
+      <RecurringDueSection
+        currency={currency}
+        onOpenRecurringEditor={onEditRecurring}
+        onShowToast={onShowToast}
+      />
+
       <section className="screen-grid secondary-grid">
-        <TransactionList
+        <TransactionHistory
           title="Recent transactions"
+          embedInPanel
           categories={state.categories}
           transactions={recentTransactions}
           currency={currency}
           emptyMessage="Your latest activity will show up here."
-          onSelect={onEditTransaction}
+          onEdit={onEditTransaction}
         />
 
         <article className="panel spotlight-card single-insight-card">
