@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { initialFinanceState } from '../domain/default-data'
 import type { FinanceState } from '../domain/models'
 import { buildBackupPayload } from './backup-service'
@@ -185,11 +185,12 @@ describe('prepareBackupRestore', () => {
   })
 
   it('returns a safe error when reading backup file fails', async () => {
-    const result = await prepareBackupRestoreFile({
-      text: async () => {
-        throw new Error('unreadable file')
-      },
-    } as File)
+    const unreadableFile = new File(['{}'], 'backup.json', {
+      type: 'application/json',
+    })
+    vi.spyOn(unreadableFile, 'text').mockRejectedValue(new Error('unreadable file'))
+
+    const result = await prepareBackupRestoreFile(unreadableFile)
 
     expect(result).toEqual({
       ok: false,

@@ -52,6 +52,7 @@ function installMatchMedia(initialMatches: boolean) {
     removeListener: vi.fn((listener: (event: MediaQueryListEvent) => void) => {
       listeners.delete(listener)
     }),
+    dispatchEvent: vi.fn(() => true),
     dispatch(nextMatches: boolean) {
       mediaQueryList.matches = nextMatches
       const event = { matches: nextMatches } as MediaQueryListEvent
