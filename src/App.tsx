@@ -13,47 +13,26 @@ import {
   BackupReminderCard,
   PrivacyFirstModal,
 } from './features/backup/backup-ui'
-import { BudgetsScreen } from './features/budgets/budgets-screen'
-import { HomeScreen } from './features/home/home-screen'
-import { InsightsScreen } from './features/insights/insights-screen'
 import { useInstallPrompt } from './pwa/register-service-worker'
 import { AppHeader } from './features/shell/app-header'
 import { TabBar, type AppTab } from './features/shell/tab-bar'
-import { SettingsScreen } from './features/settings/settings-screen'
+import {
+  APP_HEADER_STATUS_MODE,
+  getActiveTabMeta,
+  getHeaderVariant,
+} from './features/shell/app-tab-metadata'
+import { AppScreenResolver } from './features/shell/app-screen-resolver'
+import { useEditorOrchestration } from './features/shell/use-editor-orchestration'
 import { RecurringEditorSheet } from './features/recurring/recurring-editor-sheet'
 import { TransactionEditorSheet } from './features/transactions/transaction-editor-sheet'
-import { TransactionsScreen } from './features/transactions/transactions-screen'
 import { FinanceProvider } from './state/finance-context'
 import { useFinance } from './state/use-finance'
-import type { BackupPreferences, Transaction } from './domain/models'
+import type { BackupPreferences } from './domain/models'
 import type {
   AddTransactionInput,
   TransactionRecurrenceInput,
   UpdateTransactionInput,
 } from './state/finance-store'
-
-const tabMeta: Record<AppTab, { title: string; subtitle: string }> = {
-  home: {
-    title: 'This month, at a glance',
-    subtitle: 'See where you stand now and record the next spend.',
-  },
-  transactions: {
-    title: 'Records',
-    subtitle: 'Search, filter, and edit your history.',
-  },
-  insights: {
-    title: 'Insights',
-    subtitle: 'Understand spending with breakdowns and trend views.',
-  },
-  budgets: {
-    title: 'Budgets',
-    subtitle: 'Use category budgets as your guardrails.',
-  },
-  settings: {
-    title: 'App settings',
-    subtitle: 'Manage categories, theme, backups, and preferences.',
-  },
-}
 
 function FinanceWorkspace() {
   const {
@@ -68,8 +47,19 @@ function FinanceWorkspace() {
   } = useFinance()
   const { canInstall, install, isInstalled } = useInstallPrompt()
   const [activeTab, setActiveTab] = useState<AppTab>('home')
-  const [editorTransactionId, setEditorTransactionId] = useState<string | null>(null)
-  const [recurringEditorId, setRecurringEditorId] = useState<string | null>(null)
+  const {
+    editorTransactionId,
+    editingTransaction,
+    editingRecurringTemplate,
+    openQuickAdd,
+    openTransactionEditor,
+    openRecurringEditor,
+    closeEditor,
+    closeRecurringEditor,
+  } = useEditorOrchestration({
+    transactions: state.transactions,
+    recurringTemplates: state.recurringTemplates,
+  })
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null)
   const [isBackupReminderVisible, setIsBackupReminderVisible] = useState(false)
   const toastTimeoutRef = useRef<number | null>(null)
@@ -89,23 +79,9 @@ function FinanceWorkspace() {
     setActiveTab(tab)
   }
 
-  const activeMeta =
-    activeTab === 'insights' || activeTab === 'budgets'
-      ? { title: tabMeta[activeTab].title, subtitle: currentMonthLabel }
-      : activeTab === 'settings'
-        ? { title: 'Settings', subtitle: 'General, data, recurring, and categories' }
-        : tabMeta[activeTab]
-  const headerStatusMode = 'hidden'
-  const headerVariant =
-    activeTab === 'insights' || activeTab === 'budgets' || activeTab === 'settings'
-      ? 'compact'
-      : 'default'
-  const editingTransaction = editorTransactionId
-    ? state.transactions.find((transaction) => transaction.id === editorTransactionId) ?? null
-    : null
-  const editingRecurringTemplate = recurringEditorId
-    ? state.recurringTemplates.find((template) => template.id === recurringEditorId) ?? null
-    : null
+  const activeMeta = getActiveTabMeta(activeTab, currentMonthLabel)
+  const headerStatusMode = APP_HEADER_STATUS_MODE
+  const headerVariant = getHeaderVariant(activeTab)
 
   useEffect(() => {
     return () => {
@@ -259,29 +235,6 @@ function FinanceWorkspace() {
     showToast('Deleted')
   }
 
-  const openQuickAdd = () => {
-    setRecurringEditorId(null)
-    setEditorTransactionId('create')
-  }
-
-  const openTransactionEditor = (transaction: Transaction) => {
-    setRecurringEditorId(null)
-    setEditorTransactionId(transaction.id)
-  }
-
-  const openRecurringEditor = (templateId: string) => {
-    setEditorTransactionId(null)
-    setRecurringEditorId(templateId)
-  }
-
-  const closeEditor = () => {
-    setEditorTransactionId(null)
-  }
-
-  const closeRecurringEditor = () => {
-    setRecurringEditorId(null)
-  }
-
   const showPrivacyModal = isLoaded && !state.settings.hasSeenPrivacyModal
   const showBackupReminder =
     isLoaded &&
@@ -290,42 +243,6 @@ function FinanceWorkspace() {
     editorTransactionId === null &&
     isBackupReminderVisible &&
     state.settings.backupRemindersEnabled
-
-  let screen = (
-    <HomeScreen
-      onNavigate={handleTabChange}
-      onEditTransaction={openTransactionEditor}
-      onEditRecurring={openRecurringEditor}
-      onShowToast={showToast}
-    />
-  )
-
-  if (activeTab === 'transactions') {
-    screen = <TransactionsScreen onEditTransaction={openTransactionEditor} />
-  }
-
-  if (activeTab === 'insights') {
-    screen = <InsightsScreen />
-  }
-
-  if (activeTab === 'budgets') {
-    screen = <BudgetsScreen />
-  }
-
-  if (activeTab === 'settings') {
-    screen = (
-      <SettingsScreen
-        canInstall={canInstall}
-        isInstalled={isInstalled}
-        onCreateBackup={() => createBackup()}
-        onInstall={() => {
-          void install()
-        }}
-        onOpenRecurringEditor={openRecurringEditor}
-        onShowToast={showToast}
-      />
-    )
-  }
 
   return (
     <div className="app-shell">
@@ -357,7 +274,19 @@ function FinanceWorkspace() {
         ) : null}
 
         {isLoaded ? (
-          screen
+          <AppScreenResolver
+            activeTab={activeTab}
+            canInstall={canInstall}
+            isInstalled={isInstalled}
+            onCreateBackup={() => createBackup()}
+            onInstall={() => {
+              void install()
+            }}
+            onNavigate={handleTabChange}
+            onEditTransaction={openTransactionEditor}
+            onEditRecurring={openRecurringEditor}
+            onShowToast={showToast}
+          />
         ) : (
           <section className="panel loading-panel">
             <p className="eyebrow">LOADING</p>

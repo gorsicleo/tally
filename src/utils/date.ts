@@ -2,6 +2,12 @@ function padDatePart(value: number): string {
   return String(value).padStart(2, '0')
 }
 
+const LOCAL_NOON_SUFFIX = 'T12:00:00'
+
+function createLocalNoonDate(isoDate: string): Date {
+  return new Date(`${isoDate}${LOCAL_NOON_SUFFIX}`)
+}
+
 function parseLocalDateKey(isoDate: string): {
   year: number
   month: number
@@ -25,7 +31,7 @@ export function getTodayLocalDate(): string {
 }
 
 export function shiftLocalDateKey(isoDate: string, dayOffset: number): string {
-  const shiftedDate = new Date(`${isoDate}T12:00:00`)
+  const shiftedDate = createLocalNoonDate(isoDate)
   shiftedDate.setDate(shiftedDate.getDate() + dayOffset)
 
   return toLocalDateKey(shiftedDate)

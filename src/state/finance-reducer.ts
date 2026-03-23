@@ -1,161 +1,34 @@
-import { createId } from '../utils/id'
 import { isSystemCategory } from '../domain/categories'
-import { validateBudgetCategoryIds } from '../domain/budget-service'
-import type { CategoryDeletionPlan } from '../domain/category-service'
-import type {
-  AppSettings,
-  Budget,
-  Category,
-  CategoryKind,
-  FinanceState,
-  RecurringTemplate,
-  SyncQueueItem,
-  Transaction,
-} from '../domain/models'
-
-type FinanceAction =
-  | { type: 'hydrate'; payload: FinanceState }
-  | { type: 'replace-state'; payload: FinanceState }
-  | { type: 'add-category'; payload: Category }
-  | { type: 'update-category'; payload: Category }
-  | {
-      type: 'delete-category'
-      payload: { plan: CategoryDeletionPlan; updatedAt: string }
-    }
-  | { type: 'add-transaction'; payload: Transaction }
-  | { type: 'update-transaction'; payload: Transaction }
-  | { type: 'delete-transaction'; payload: { id: string } }
-  | { type: 'add-recurring-template'; payload: RecurringTemplate }
-  | { type: 'update-recurring-template'; payload: RecurringTemplate }
-  | { type: 'stop-recurring-template'; payload: { id: string; updatedAt: string } }
-  | {
-      type: 'add-recurring-occurrences'
-      payload: {
-        templateId: string
-        transactions: Transaction[]
-        nextDueDate: string
-        updatedAt: string
-      }
-    }
-  | {
-      type: 'skip-recurring-occurrences'
-      payload: {
-        templateId: string
-        nextDueDate: string
-        updatedAt: string
-      }
-    }
-  | { type: 'set-budget'; payload: Budget }
-  | { type: 'remove-budget'; payload: { id: string } }
-  | { type: 'update-settings'; payload: Partial<AppSettings> }
-  | { type: 'sync-attempt'; payload: { at: string } }
-  | { type: 'sync-success'; payload: { at: string; operationIds: string[] } }
-  | {
-      type: 'sync-failure'
-      payload: { at: string; operationIds: string[]; error: string }
-    }
-
-function isCategoryCompatible(
-  category: Category,
-  entry: Pick<Transaction, 'type'>,
-): boolean {
-  return category.kind === 'both' || category.kind === entry.type
-}
-
-function categoryKindSupportsTransactions(
-  kind: CategoryKind,
-  transactions: Transaction[],
-): boolean {
-  return transactions.every(
-    (transaction) => kind === 'both' || transaction.type === kind,
-  )
-}
-
-function categoryKindSupportsRecurringTemplates(
-  kind: CategoryKind,
-  recurringTemplates: RecurringTemplate[],
-): boolean {
-  return recurringTemplates.every(
-    (template) => kind === 'both' || template.type === kind,
-  )
-}
-
-function entityKey(entityType: SyncQueueItem['entityType'], entityId: string): string {
-  return `${entityType}:${entityId}`
-}
-
-function queueOperation(
-  queue: SyncQueueItem[],
-  entityType: SyncQueueItem['entityType'],
-  action: SyncQueueItem['action'],
-  entityId: string,
-  payload: SyncQueueItem['payload'],
-): SyncQueueItem[] {
-  const nextOperation: SyncQueueItem = {
-    id: createId('sync'),
-    entityType,
-    action,
-    entityId,
-    payload,
-    queuedAt: new Date().toISOString(),
-    attempts: 0,
-  }
-
-  return [
-    ...queue.filter(
-      (item) => !(item.entityType === entityType && item.entityId === entityId),
-    ),
-    nextOperation,
-  ]
-}
-
-function queueTransactionUpserts(
-  queue: SyncQueueItem[],
-  transactions: Transaction[],
-): SyncQueueItem[] {
-  return transactions.reduce(
-    (nextQueue, transaction) =>
-      queueOperation(
-        nextQueue,
-        'transaction',
-        'upsert',
-        transaction.id,
-        transaction,
-      ),
-    queue,
-  )
-}
-
-function queueBudgetUpserts(
-  queue: SyncQueueItem[],
-  budgets: Budget[],
-): SyncQueueItem[] {
-  return budgets.reduce(
-    (nextQueue, budget) =>
-      queueOperation(nextQueue, 'budget', 'upsert', budget.id, budget),
-    queue,
-  )
-}
-
-function markEntityStatus<T extends { id: string; syncStatus: string }>(
-  items: T[],
-  entityIds: Set<string>,
-  syncStatus: 'synced' | 'pending' | 'failed',
-): T[] {
-  return items.map((item) =>
-    entityIds.has(item.id) ? { ...item, syncStatus } : item,
-  )
-}
-
-function recordMeaningfulChange(nextState: FinanceState): FinanceState {
-  return {
-    ...nextState,
-    settings: {
-      ...nextState.settings,
-      changesSinceBackup: nextState.settings.changesSinceBackup + 1,
-    },
-  }
-}
+import type { Budget, FinanceState } from '../domain/models'
+import type { FinanceAction } from './finance-reducer-types'
+import {
+  handleSetBudget,
+  handleRemoveBudget,
+} from './reducer-cases/budgets'
+import {
+  handleHydrate,
+  handleReplaceState,
+  handleSyncAttempt,
+  handleUpdateSettings,
+} from './reducer-cases/meta-settings'
+import {
+  handleAddTransaction,
+  handleDeleteTransaction,
+  handleUpdateTransaction,
+} from './reducer-cases/transactions'
+import {
+  categoryKindSupportsRecurringTemplates,
+  categoryKindSupportsTransactions,
+  isCategoryCompatible,
+} from './reducer-utils/category-compat'
+import { recordMeaningfulChange } from './reducer-utils/change-tracking'
+import {
+  entityKey,
+  queueBudgetUpserts,
+  queueOperation,
+  queueTransactionUpserts,
+} from './reducer-utils/queue'
+import { markEntityStatus } from './reducer-utils/sync-status'
 
 export function financeReducer(
   state: FinanceState,
@@ -163,8 +36,10 @@ export function financeReducer(
 ): FinanceState {
   switch (action.type) {
     case 'hydrate':
+      return handleHydrate(state, action)
+
     case 'replace-state':
-      return action.payload
+      return handleReplaceState(state, action)
 
     case 'add-category': {
       const normalizedName = action.payload.name.trim().toLowerCase()
@@ -344,85 +219,15 @@ export function financeReducer(
     }
 
     case 'add-transaction': {
-      if (action.payload.amount <= 0 || Number.isNaN(action.payload.amount)) {
-        return state
-      }
-
-      const category = state.categories.find(
-        (entry) => entry.id === action.payload.categoryId,
-      )
-
-      if (!category || !isCategoryCompatible(category, action.payload)) {
-        return state
-      }
-
-      return recordMeaningfulChange({
-        ...state,
-        transactions: [action.payload, ...state.transactions],
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'transaction',
-          'upsert',
-          action.payload.id,
-          action.payload,
-        ),
-      })
+      return handleAddTransaction(state, action)
     }
 
     case 'update-transaction': {
-      const existingTransaction = state.transactions.find(
-        (transaction) => transaction.id === action.payload.id,
-      )
-
-      if (!existingTransaction) {
-        return state
-      }
-
-      const category = state.categories.find(
-        (entry) => entry.id === action.payload.categoryId,
-      )
-
-      if (!category || !isCategoryCompatible(category, action.payload)) {
-        return state
-      }
-
-      return recordMeaningfulChange({
-        ...state,
-        transactions: state.transactions.map((transaction) =>
-          transaction.id === action.payload.id ? action.payload : transaction,
-        ),
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'transaction',
-          'upsert',
-          action.payload.id,
-          action.payload,
-        ),
-      })
+      return handleUpdateTransaction(state, action)
     }
 
     case 'delete-transaction': {
-      const existingTransaction = state.transactions.find(
-        (transaction) => transaction.id === action.payload.id,
-      )
-
-      if (!existingTransaction) {
-        return state
-      }
-
-      return recordMeaningfulChange({
-        ...state,
-        transactions: state.transactions.filter(
-          (transaction) => transaction.id !== action.payload.id,
-        ),
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'transaction',
-          'delete',
-          action.payload.id,
-          null,
-        ),
-      })
+      return handleDeleteTransaction(state, action)
     }
 
     case 'add-recurring-template': {
@@ -541,84 +346,18 @@ export function financeReducer(
     }
 
     case 'set-budget': {
-      const normalizedName = action.payload.name.trim()
-      const categoryIds = validateBudgetCategoryIds(
-        action.payload.categoryIds,
-        state.categories,
-      )
-
-      if (
-        !normalizedName ||
-        categoryIds.length === 0 ||
-        !Number.isFinite(action.payload.limit) ||
-        action.payload.limit <= 0
-      ) {
-        return state
-      }
-
-      const normalizedBudget: Budget = {
-        ...action.payload,
-        name: normalizedName,
-        categoryIds,
-      }
-
-      const nextBudgets = state.budgets.some(
-        (budget) => budget.id === normalizedBudget.id,
-      )
-        ? state.budgets.map((budget) =>
-            budget.id === normalizedBudget.id ? normalizedBudget : budget,
-          )
-        : [...state.budgets, normalizedBudget]
-
-      return recordMeaningfulChange({
-        ...state,
-        budgets: nextBudgets,
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'budget',
-          'upsert',
-          normalizedBudget.id,
-          normalizedBudget,
-        ),
-      })
+      return handleSetBudget(state, action)
     }
 
     case 'remove-budget': {
-      const existingBudget = state.budgets.find(
-        (budget) => budget.id === action.payload.id,
-      )
-
-      if (!existingBudget) {
-        return state
-      }
-
-      return recordMeaningfulChange({
-        ...state,
-        budgets: state.budgets.filter((budget) => budget.id !== action.payload.id),
-        syncQueue: queueOperation(
-          state.syncQueue,
-          'budget',
-          'delete',
-          action.payload.id,
-          null,
-        ),
-      })
+      return handleRemoveBudget(state, action)
     }
 
     case 'update-settings':
-      return {
-        ...state,
-        settings: {
-          ...state.settings,
-          ...action.payload,
-        },
-      }
+      return handleUpdateSettings(state, action)
 
     case 'sync-attempt':
-      return {
-        ...state,
-        lastSyncAttemptAt: action.payload.at,
-      }
+      return handleSyncAttempt(state, action)
 
     case 'sync-success': {
       const appliedIds = new Set(action.payload.operationIds)

@@ -29,6 +29,12 @@ const monthFormatter = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 })
 
+const LOCAL_NOON_SUFFIX = 'T12:00:00'
+
+function createLocalNoonDate(isoDate: string): Date {
+  return new Date(`${isoDate}${LOCAL_NOON_SUFFIX}`)
+}
+
 function getCurrencyFormatter(currency: string): Intl.NumberFormat {
   const upperCurrency = currency.toUpperCase()
   const cachedFormatter = currencyFormatters.get(upperCurrency)
@@ -65,15 +71,15 @@ export function formatCurrency(value: number, currency = 'USD'): string {
 }
 
 export function formatDateLabel(isoDate: string): string {
-  return dateFormatter.format(new Date(`${isoDate}T12:00:00`))
+  return dateFormatter.format(createLocalNoonDate(isoDate))
 }
 
 export function formatLongDateLabel(isoDate: string): string {
-  return longDateFormatter.format(new Date(`${isoDate}T12:00:00`))
+  return longDateFormatter.format(createLocalNoonDate(isoDate))
 }
 
 export function formatCompactDateLabel(isoDate: string): string {
-  return compactDateFormatter.format(new Date(`${isoDate}T12:00:00`))
+  return compactDateFormatter.format(createLocalNoonDate(isoDate))
 }
 
 export function formatDateTimeLabel(value: string | null): string {
