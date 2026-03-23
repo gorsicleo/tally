@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { initialFinanceState } from '../domain/default-data'
 import type { FinanceState } from '../domain/models'
 import { buildBackupPayload } from './backup-service'
-import { prepareBackupRestore } from './restore-service'
+import { prepareBackupRestore, prepareBackupRestoreFile } from './restore-service'
 
 function createSampleState(): FinanceState {
   return {
@@ -115,6 +115,32 @@ describe('prepareBackupRestore', () => {
     })
   })
 
+  it('rejects schema version 2 payloads that omit recurring templates', () => {
+    const result = prepareBackupRestore(
+      JSON.stringify({
+        schemaVersion: 2,
+        exportedAt: '2026-03-19T09:30:00.000Z',
+        app: 'Tally',
+        data: {
+          transactions: [],
+          categories: initialFinanceState.categories,
+          budgets: [],
+          preferences: {
+            theme: 'dark',
+            currency: 'USD',
+            syncEndpoint: 'demo://local',
+            conflictPolicy: 'client-wins',
+          },
+        },
+      }),
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'This backup file is not valid.',
+    })
+  })
+
   it('migrates schema version 1 backups by defaulting recurring templates to empty', () => {
     const result = prepareBackupRestore(
       JSON.stringify({
@@ -156,5 +182,18 @@ describe('prepareBackupRestore', () => {
     expect(result.prepared.payload.schemaVersion).toBe(2)
     expect(result.prepared.nextState.recurringTemplates).toHaveLength(0)
     expect(result.prepared.nextState.transactions[0].recurringTemplateId).toBeNull()
+  })
+
+  it('returns a safe error when reading backup file fails', async () => {
+    const result = await prepareBackupRestoreFile({
+      text: async () => {
+        throw new Error('unreadable file')
+      },
+    } as File)
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'This backup file is not valid.',
+    })
   })
 })

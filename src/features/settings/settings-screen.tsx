@@ -763,6 +763,7 @@ export function SettingsScreen({
               ref={importInputRef}
               className="settings-import-input"
               type="file"
+              aria-label="Restore backup file"
               accept=".json,application/json"
               onChange={handleImport}
             />
