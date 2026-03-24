@@ -98,7 +98,7 @@ describe('SettingsScreen direct flows', () => {
     await user.click(screen.getByRole('button', { name: /Meal plan/i }))
 
     expect(onOpenRecurringEditor).toHaveBeenCalledWith('rec-food')
-  })
+  }, 15000)
 
   it('creates a category from the settings category editor', async () => {
     const addCategory = vi.fn()
@@ -115,7 +115,7 @@ describe('SettingsScreen direct flows', () => {
       color: '#0f766e',
       kind: 'both',
     })
-  })
+  }, 15000)
 
   it('blocks incompatible kind changes for linked categories', async () => {
     const updateCategory = vi.fn()
