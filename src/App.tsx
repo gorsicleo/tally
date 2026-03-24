@@ -13,6 +13,7 @@ import {
   BackupReminderCard,
   PrivacyFirstModal,
 } from './features/backup/backup-ui'
+import { UpdateManager } from './features/backup/update-manager'
 import { useInstallPrompt } from './pwa/register-service-worker'
 import { AppHeader } from './features/shell/app-header'
 import { TabBar, type AppTab } from './features/shell/tab-bar'
@@ -255,6 +256,8 @@ function FinanceWorkspace() {
       />
 
       <main className="app-main">
+        {isLoaded ? <UpdateManager onCreateBackup={() => createBackup()} /> : null}
+
         {showBackupReminder ? (
           <BackupReminderCard
             body={backupReminderBody}

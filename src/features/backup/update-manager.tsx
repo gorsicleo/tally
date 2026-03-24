@@ -1,0 +1,221 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useServiceWorkerUpdate } from '../../pwa/use-service-worker-update'
+import {
+  getUpdateDisplayInfo,
+  getUpdateSeverityDecision,
+} from '../../pwa/update-prompt-state'
+
+interface UpdateManagerProps {
+  onCreateBackup: () => Promise<boolean>
+}
+
+type UpdateFlowStep = 'prompt' | 'confirm-recommended' | 'require-backup'
+
+export function UpdateManager({ onCreateBackup }: UpdateManagerProps) {
+  const {
+    availableVersionInfo,
+    isApplyingUpdate,
+    isIosStandalone,
+    needsReload,
+    promptVisible,
+    applyUpdate,
+    dismiss,
+  } = useServiceWorkerUpdate()
+  const [step, setStep] = useState<UpdateFlowStep>('prompt')
+  const [hasCompletedRequiredBackup, setHasCompletedRequiredBackup] =
+    useState(false)
+  const [isBackingUp, setIsBackingUp] = useState(false)
+
+  const versionKey = availableVersionInfo?.version ?? 'no-update'
+
+  useEffect(() => {
+    setStep('prompt')
+    setHasCompletedRequiredBackup(false)
+    setIsBackingUp(false)
+  }, [versionKey])
+
+  const changelog = useMemo(
+    () => getUpdateDisplayInfo(availableVersionInfo).changelog,
+    [availableVersionInfo],
+  )
+
+  if (!promptVisible || !availableVersionInfo) {
+    return null
+  }
+
+  const handleCreateBackup = async () => {
+    setIsBackingUp(true)
+
+    try {
+      const didCreateBackup = await onCreateBackup()
+
+      if (didCreateBackup) {
+        setHasCompletedRequiredBackup(true)
+      }
+    } finally {
+      setIsBackingUp(false)
+    }
+  }
+
+  const displayInfo = getUpdateDisplayInfo(availableVersionInfo)
+  const severityDecision = getUpdateSeverityDecision(displayInfo.severity)
+  const updateLabel = needsReload ? 'Reload' : 'Update'
+
+  const handlePrimaryAction = () => {
+    if (needsReload || !severityDecision.requiresWarningStep) {
+      void applyUpdate()
+      return
+    }
+
+    if (!severityDecision.requiresBackup) {
+      setStep('confirm-recommended')
+      return
+    }
+
+    setStep('require-backup')
+  }
+
+  const handleDismiss = () => {
+    setStep('prompt')
+    dismiss()
+  }
+
+  const renderPromptBody = () => {
+    if (step === 'confirm-recommended') {
+      return (
+        <>
+          <div className="backup-modal-copy">
+            <p>We recommend backing up your data before updating.</p>
+            <p>You can continue without a backup, but a fresh backup is safer before larger app changes.</p>
+          </div>
+
+          <div className="backup-modal-actions update-modal-actions">
+            <button type="button" className="ghost-button" onClick={handleDismiss}>
+              Later
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                void handleCreateBackup()
+              }}
+              disabled={isBackingUp || isApplyingUpdate}
+            >
+              {isBackingUp ? 'Creating backup...' : 'Create backup'}
+            </button>
+            <button
+              type="button"
+              className="submit-button"
+              onClick={() => {
+                void applyUpdate()
+              }}
+              disabled={isApplyingUpdate}
+            >
+              {isApplyingUpdate ? 'Updating...' : hasCompletedRequiredBackup ? 'Update now' : 'Update anyway'}
+            </button>
+          </div>
+        </>
+      )
+    }
+
+    if (step === 'require-backup') {
+      return (
+        <>
+          <div className="backup-modal-copy">
+            <p><strong>Backup required before updating.</strong></p>
+            <p>Create a local backup first, then finish installing the new version.</p>
+          </div>
+
+          <div className="backup-modal-actions update-modal-actions">
+            <button type="button" className="ghost-button" onClick={handleDismiss}>
+              Later
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                void handleCreateBackup()
+              }}
+              disabled={isBackingUp || isApplyingUpdate}
+            >
+              {isBackingUp ? 'Creating backup...' : 'Create backup'}
+            </button>
+            <button
+              type="button"
+              className="submit-button"
+              onClick={() => {
+                void applyUpdate()
+              }}
+              disabled={!hasCompletedRequiredBackup || isApplyingUpdate}
+            >
+              {isApplyingUpdate ? 'Updating...' : updateLabel}
+            </button>
+          </div>
+        </>
+      )
+    }
+
+    return (
+      <>
+        <div className="backup-modal-copy">
+          <p>
+            {needsReload
+              ? 'A newer version is active and this tab can reload when you are ready.'
+              : 'A newer version of Tally is ready to install on this device.'}
+          </p>
+          {displayInfo.version ? (
+            <p className="support-copy">Version {displayInfo.version}</p>
+          ) : null}
+          {changelog.length > 0 ? (
+            <ul className="update-changelog-list">
+              {changelog.map((entry) => (
+                <li key={entry}>{entry}</li>
+              ))}
+            </ul>
+          ) : null}
+          {severityDecision.requiresWarningStep && !needsReload ? (
+            <p className="support-copy">
+              {!severityDecision.requiresBackup
+                ? 'This release is safer with a fresh backup.'
+                : 'This release requires a backup before installing.'}
+            </p>
+          ) : null}
+          {isIosStandalone ? (
+            <p className="support-copy">
+              Installed iPhone and iPad apps can apply updates later than Safari. If the version does not change immediately, close and reopen the app.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="backup-modal-actions update-modal-actions">
+          <button type="button" className="ghost-button" onClick={handleDismiss}>
+            Later
+          </button>
+          <button
+            type="button"
+            className="submit-button"
+            onClick={handlePrimaryAction}
+            disabled={isApplyingUpdate}
+          >
+            {isApplyingUpdate ? 'Updating...' : updateLabel}
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="panel modal-panel backup-modal-panel update-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-available-title"
+      >
+        <p className="eyebrow">UPDATE</p>
+        <h2 id="update-available-title">Update available</h2>
+        {renderPromptBody()}
+      </section>
+    </div>
+  )
+}

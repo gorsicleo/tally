@@ -42,6 +42,10 @@ vi.mock('./pwa/register-service-worker', () => ({
   },
 }))
 
+vi.mock('./features/backup/update-manager', () => ({
+  UpdateManager: () => null,
+}))
+
 function createLoadedState(overrides: Partial<FinanceState> = {}): FinanceState {
   return {
     ...initialFinanceState,
