@@ -1,0 +1,76 @@
+name: Refactor / tech debt
+description: Track maintainability, performance, cleanup, or architecture improvements.
+title: "refactor: "
+labels:
+  - refactor
+  - tech-debt
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for non-feature, non-bug improvements.
+        Keep scope focused and outcomes measurable.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be improved?
+      placeholder: Simplify transaction editor state flow to reduce duplicate logic.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this refactor or debt work needed?
+      placeholder: Current logic is split across multiple hooks, which increases regression risk.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Define boundaries clearly.
+      placeholder: |
+        In scope: transaction editor orchestration and related reducer utilities.
+        Out of scope: visual redesign of the editor sheet.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Concrete steps to complete.
+      placeholder: |
+        - Identify and remove duplicated branches
+        - Extract shared utility/helpers
+        - Preserve behavior with tests
+        - Document notable architectural decisions
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What proves the work is done safely?
+      placeholder: |
+        - Behavior is unchanged from user perspective
+        - Test coverage is maintained or improved
+        - Code complexity/readability is improved in touched areas
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks_dependencies
+    attributes:
+      label: Risks / dependencies (optional)
+      description: Known tradeoffs, migration concerns, or blockers.
+      placeholder: Depends on pending reducer case cleanup; watch for selector performance regressions.
+    validations:
+      required: false

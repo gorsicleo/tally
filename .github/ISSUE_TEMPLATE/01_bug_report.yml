@@ -1,0 +1,101 @@
+name: Bug report
+description: Report a reproducible problem to help us fix it quickly.
+title: "bug: "
+labels:
+  - bug
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this issue.
+        Please keep details focused and reproducible.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be fixed?
+      placeholder: Prevent duplicate recurring items from showing on Home after save.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What were you doing when this happened?
+      placeholder: I was editing a recurring template from Settings and then returned to Home.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Provide exact steps so maintainers can reproduce.
+      placeholder: |
+        1. Open Settings > Recurring
+        2. Edit any recurring template
+        3. Save and return to Home
+        4. Observe duplicate due item
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      placeholder: Only one due item is shown for the template.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: Actual behavior
+      placeholder: The same due item appears twice until app reload.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What areas seem affected?
+      placeholder: Home due section, recurring selectors, and persisted state refresh.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggested_tasks
+    attributes:
+      label: Suggested tasks
+      description: Optional implementation ideas.
+      placeholder: |
+        - Add failing unit/integration test
+        - Fix selector deduplication logic
+        - Verify no regression in due summary counts
+    validations:
+      required: false
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Clear conditions for done.
+      placeholder: |
+        - Bug is reproducible before fix and not reproducible after fix
+        - Tests cover the regression
+        - Existing related behavior remains unchanged
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / version / logs (optional)
+      description: Include browser, OS, app version/commit, screenshots, logs, or stack traces.
+      placeholder: Linux + Firefox 125, commit abc123, console error attached.
+    validations:
+      required: false
