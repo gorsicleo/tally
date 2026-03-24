@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 
 export type AppTab =
   | 'home'
@@ -75,43 +75,7 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
     budgets: null,
     settings: null,
   })
-  const [indicator, setIndicator] = useState({
-    left: 0,
-    top: 0,
-    width: 0,
-    height: 0,
-    opacity: 0,
-  })
   const [isDragging, setIsDragging] = useState(false)
-
-  useEffect(() => {
-    const syncIndicator = () => {
-      const container = innerRef.current
-      const button = buttonRefs.current[activeTab]
-
-      if (!container || !button) {
-        return
-      }
-
-      const containerRect = container.getBoundingClientRect()
-      const buttonRect = button.getBoundingClientRect()
-
-      setIndicator({
-        left: buttonRect.left - containerRect.left,
-        top: buttonRect.top - containerRect.top,
-        width: buttonRect.width,
-        height: buttonRect.height,
-        opacity: 1,
-      })
-    }
-
-    syncIndicator()
-    window.addEventListener('resize', syncIndicator)
-
-    return () => {
-      window.removeEventListener('resize', syncIndicator)
-    }
-  }, [activeTab])
 
   const updatePointerGlow = (clientX: number, clientY: number) => {
     const container = innerRef.current
@@ -234,17 +198,6 @@ export function TabBar({ activeTab, onChange }: TabBarProps) {
         onPointerCancel={handlePointerEnd}
         onPointerLeave={handlePointerEnd}
       >
-        <div
-          className="tab-bar-indicator"
-          aria-hidden="true"
-          style={{
-            transform: `translate3d(${indicator.left}px, ${indicator.top}px, 0)`,
-            width: `${indicator.width}px`,
-            height: `${indicator.height}px`,
-            opacity: indicator.opacity,
-          }}
-        />
-
         {tabs.map((tab) => {
           const isActive = tab.id === activeTab
 

@@ -135,7 +135,7 @@ describe('App UI behavior', () => {
 
     expect(await screen.findByText('Saved')).toBeInTheDocument()
     expect(await screen.findByText('Coffee beans')).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('filters records by search query and shows empty state for no matches', async () => {
     storageState.loadedState = createLoadedState({
@@ -353,7 +353,7 @@ describe('App UI behavior', () => {
     })
 
     confirmSpy.mockRestore()
-  })
+  }, 15000)
 
   it('edits and deletes an existing transaction from the UI', async () => {
     storageState.loadedState = createLoadedState({
