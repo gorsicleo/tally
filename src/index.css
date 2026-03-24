@@ -468,6 +468,10 @@ textarea:focus-visible {
   max-width: 540px;
 }
 
+.update-modal-panel {
+  gap: 16px;
+}
+
 .backup-modal-copy,
 .backup-reminder-copy,
 .settings-row-copy {
@@ -493,6 +497,22 @@ textarea:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.update-modal-actions {
+  justify-content: flex-end;
+}
+
+.update-changelog-list {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+}
+
+.update-changelog-list li {
+  line-height: 1.4;
 }
 
 .backup-modal-actions {
