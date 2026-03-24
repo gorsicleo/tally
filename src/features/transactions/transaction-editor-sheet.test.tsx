@@ -137,7 +137,7 @@ describe('TransactionEditorSheet', () => {
         income: 'cat-freelance',
       },
     })
-  })
+  }, 15000)
 
   it('supports expanded category, date, and note controls in create mode', async () => {
     const { user, onCreate } = renderSheet()

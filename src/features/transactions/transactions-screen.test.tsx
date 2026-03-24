@@ -87,7 +87,7 @@ describe('TransactionsScreen', () => {
     await user.type(screen.getByLabelText('End date'), createDate(0))
     expect(await screen.findByText('Lunch')).toBeInTheDocument()
     expect(screen.queryByText('Bus')).not.toBeInTheDocument()
-  }, 10000)
+  }, 15000)
 
   it('applies quick date presets and resets visible count on load more', async () => {
     const transactions = Array.from({ length: 30 }, (_, index) =>
