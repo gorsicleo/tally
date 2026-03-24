@@ -223,6 +223,48 @@ describe('App UI behavior', () => {
     expect(screen.getByText('$125.00')).toBeInTheDocument()
   })
 
+  it('does not show backup reminder immediately after first-run privacy confirmation', async () => {
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...initialFinanceState.settings,
+        hasSeenPrivacyModal: false,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+      },
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+    })
+
+    renderWithUser(<App />)
+
+    const privacyDialog = await screen.findByRole('dialog', {
+      name: 'Private by default',
+    })
+
+    fireEvent.click(within(privacyDialog).getByRole('button', { name: 'I understand' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Private by default' }),
+      ).not.toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as
+      | FinanceState
+      | undefined
+
+    expect(latestSavedState?.settings.hasSeenPrivacyModal).toBe(true)
+    expect(latestSavedState?.settings.lastBackupAt).not.toBeNull()
+    expect(latestSavedState?.settings.changesSinceBackup).toBe(0)
+  }, 15000)
+
   it('supports category deletion flow from settings with confirmation', async () => {
     storageState.loadedState = createLoadedState({
       transactions: [

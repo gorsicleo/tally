@@ -129,12 +129,31 @@ function FinanceWorkspace() {
 
   const handleContinuePrivacyModal = useCallback(
     async (remindersEnabled: boolean) => {
+      const shouldSeedInitialBackupBaseline =
+        !state.settings.hasSeenPrivacyModal &&
+        state.settings.lastBackupAt === null &&
+        state.settings.changesSinceBackup === 0 &&
+        state.transactions.length === 0 &&
+        state.budgets.length === 0 &&
+        state.recurringTemplates.length === 0
+
       updateBackupSettings({
         hasSeenPrivacyModal: true,
         backupRemindersEnabled: remindersEnabled,
+        ...(shouldSeedInitialBackupBaseline
+          ? { lastBackupAt: new Date().toISOString(), lastReminderAt: null }
+          : {}),
       })
     },
-    [updateBackupSettings],
+    [
+      state.budgets.length,
+      state.recurringTemplates.length,
+      state.settings.changesSinceBackup,
+      state.settings.hasSeenPrivacyModal,
+      state.settings.lastBackupAt,
+      state.transactions.length,
+      updateBackupSettings,
+    ],
   )
 
   useEffect(() => {
