@@ -230,6 +230,7 @@ describe('App UI behavior', () => {
         hasSeenPrivacyModal: false,
         backupRemindersEnabled: true,
         lastBackupAt: null,
+        backupReminderBaselineAt: null,
         changesSinceBackup: 0,
         lastReminderAt: null,
       },
@@ -252,6 +253,14 @@ describe('App UI behavior', () => {
       ).not.toBeInTheDocument()
     })
 
+    expect(screen.queryByLabelText('Backup reminder')).not.toBeInTheDocument()
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 900)
+    })
+
+    expect(screen.queryByLabelText('Backup reminder')).not.toBeInTheDocument()
+
     await waitFor(() => {
       expect(storageState.saveSpy).toHaveBeenCalled()
     })
@@ -261,8 +270,49 @@ describe('App UI behavior', () => {
       | undefined
 
     expect(latestSavedState?.settings.hasSeenPrivacyModal).toBe(true)
-    expect(latestSavedState?.settings.lastBackupAt).not.toBeNull()
+    expect(latestSavedState?.settings.lastBackupAt).toBeNull()
+    expect(latestSavedState?.settings.backupReminderBaselineAt).not.toBeNull()
     expect(latestSavedState?.settings.changesSinceBackup).toBe(0)
+  }, 15000)
+
+  it('preserves existing reminder metadata during first-run privacy confirmation', async () => {
+    const existingReminderAt = '2026-03-19T10:00:00.000Z'
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...initialFinanceState.settings,
+        hasSeenPrivacyModal: false,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: existingReminderAt,
+      },
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+    })
+
+    renderWithUser(<App />)
+
+    const privacyDialog = await screen.findByRole('dialog', {
+      name: 'Private by default',
+    })
+
+    fireEvent.click(within(privacyDialog).getByRole('button', { name: 'I understand' }))
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as
+      | FinanceState
+      | undefined
+
+    expect(latestSavedState?.settings.hasSeenPrivacyModal).toBe(true)
+    expect(latestSavedState?.settings.lastBackupAt).toBeNull()
+    expect(latestSavedState?.settings.backupReminderBaselineAt).toBeNull()
+    expect(latestSavedState?.settings.lastReminderAt).toBe(existingReminderAt)
   }, 15000)
 
   it('supports category deletion flow from settings with confirmation', async () => {

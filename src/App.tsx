@@ -132,7 +132,9 @@ function FinanceWorkspace() {
       const shouldSeedInitialBackupBaseline =
         !state.settings.hasSeenPrivacyModal &&
         state.settings.lastBackupAt === null &&
+        state.settings.backupReminderBaselineAt === null &&
         state.settings.changesSinceBackup === 0 &&
+        state.settings.lastReminderAt === null &&
         state.transactions.length === 0 &&
         state.budgets.length === 0 &&
         state.recurringTemplates.length === 0
@@ -141,16 +143,18 @@ function FinanceWorkspace() {
         hasSeenPrivacyModal: true,
         backupRemindersEnabled: remindersEnabled,
         ...(shouldSeedInitialBackupBaseline
-          ? { lastBackupAt: new Date().toISOString(), lastReminderAt: null }
+          ? { backupReminderBaselineAt: new Date().toISOString(), lastReminderAt: null }
           : {}),
       })
     },
     [
       state.budgets.length,
       state.recurringTemplates.length,
+      state.settings.backupReminderBaselineAt,
       state.settings.changesSinceBackup,
       state.settings.hasSeenPrivacyModal,
       state.settings.lastBackupAt,
+      state.settings.lastReminderAt,
       state.transactions.length,
       updateBackupSettings,
     ],
