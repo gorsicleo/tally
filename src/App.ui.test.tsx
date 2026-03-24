@@ -8,7 +8,7 @@ import { renderWithUser } from './test/render-utils'
 
 const storageState = vi.hoisted(() => ({
   loadedState: null as FinanceState | null,
-  saveSpy: vi.fn(async () => undefined),
+  saveSpy: vi.fn(async (_state: FinanceState) => undefined),
   downloadSpy: vi.fn(),
   restoreResult: {
     ok: false as const,
