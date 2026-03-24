@@ -1,3 +1,5 @@
+import { createLocalNoonDate } from '../utils/date'
+
 const currencyFormatters = new Map<string, Intl.NumberFormat>()
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -28,12 +30,6 @@ const monthFormatter = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   year: 'numeric',
 })
-
-const LOCAL_NOON_SUFFIX = 'T12:00:00'
-
-function createLocalNoonDate(isoDate: string): Date {
-  return new Date(`${isoDate}${LOCAL_NOON_SUFFIX}`)
-}
 
 function getCurrencyFormatter(currency: string): Intl.NumberFormat {
   const upperCurrency = currency.toUpperCase()

@@ -4,7 +4,7 @@ function padDatePart(value: number): string {
 
 const LOCAL_NOON_SUFFIX = 'T12:00:00'
 
-function createLocalNoonDate(isoDate: string): Date {
+export function createLocalNoonDate(isoDate: string): Date {
   return new Date(`${isoDate}${LOCAL_NOON_SUFFIX}`)
 }
 
