@@ -58,6 +58,7 @@ const currentVersionInfo = getCurrentAppVersionInfo()
 let serviceWorkerRegistration: ServiceWorkerRegistration | null = null
 let waitingWorker: ServiceWorker | null = null
 let activeWorker: ServiceWorker | null = null
+let hadControllerBeforeRegistration = false
 let controllerChangeHandled = false
 let visibilityListenersRegistered = false
 let reloadRequestCount = 0
@@ -207,6 +208,22 @@ function handleControllerChange() {
     return
   }
 
+  // A first-time install can claim clients and become the initial controller.
+  // That first acquisition is not an app update and should not show reload UX.
+  if (
+    !serviceWorkerUpdateSnapshot.isApplyingUpdate &&
+    !hadControllerBeforeRegistration
+  ) {
+    hadControllerBeforeRegistration = true
+
+    if (serviceWorkerRegistration?.active) {
+      activeWorker = serviceWorkerRegistration.active
+      requestVersionInfo(activeWorker)
+    }
+
+    return
+  }
+
   controllerChangeHandled = true
 
   if (serviceWorkerUpdateSnapshot.isApplyingUpdate) {
@@ -267,6 +284,9 @@ export function registerServiceWorker(): void {
   if (swRegistered) {
     return
   }
+
+  hadControllerBeforeRegistration =
+    window.navigator.serviceWorker.controller !== null
 
   swRegistered = true
 
@@ -346,6 +366,7 @@ export function resetServiceWorkerUpdateStateForTests() {
   serviceWorkerRegistration = null
   waitingWorker = null
   activeWorker = null
+  hadControllerBeforeRegistration = false
   controllerChangeHandled = false
   visibilityListenersRegistered = false
   reloadRequestCount = 0

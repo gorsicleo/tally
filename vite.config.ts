@@ -20,7 +20,7 @@ function parseSeverity(value: string | undefined) {
     return value
   }
 
-  return 'minor'
+  return 'recommended-backup'
 }
 
 export default defineConfig(() => {

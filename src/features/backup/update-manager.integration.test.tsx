@@ -148,6 +148,43 @@ describe('UpdateManager integration', () => {
     expect(worker.postMessage).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps backup-required reloads blocked until backup succeeds', async () => {
+    const worker = createMockServiceWorker()
+    const onCreateBackup = vi.fn(async () => true)
+    const reloadListener = vi.fn()
+    window.addEventListener(
+      'tally:update-reload-requested',
+      reloadListener as EventListener,
+    )
+    const { user } = renderWithUser(
+      <UpdateManager onCreateBackup={onCreateBackup} />,
+    )
+
+    act(() => {
+      simulateServiceWorkerUpdateForTests({
+        availableVersionInfo: {
+          version: '2.1.0',
+          changelog: ['Reload required'],
+          severity: 'backup-required',
+        },
+        needsReload: true,
+        waitingWorkerOverride: worker as unknown as ServiceWorker,
+      })
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Reload' }))
+
+    expect(screen.getByText('Backup required before updating.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Create backup' }))
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
+
+    expect(onCreateBackup).toHaveBeenCalledTimes(1)
+    expect(worker.postMessage).not.toHaveBeenCalled()
+    expect(reloadListener).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps the same version hidden after dismissal and re-shows a newer version', async () => {
     const { user } = renderWithUser(
       <UpdateManager onCreateBackup={vi.fn(async () => true)} />,

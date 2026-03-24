@@ -108,6 +108,31 @@ describe('UpdateManager', () => {
     expect(screen.getByRole('button', { name: 'Reload' })).toBeInTheDocument()
   })
 
+  it('blocks reload for backup-required releases until backup succeeds', async () => {
+    hookState.value = {
+      ...hookState.value,
+      needsReload: true,
+      availableVersionInfo: {
+        version: '2.1.0',
+        changelog: ['Migration in progress'],
+        severity: 'backup-required',
+      },
+    }
+    const onCreateBackup = vi.fn(async () => true)
+    const { user } = renderWithUser(<UpdateManager onCreateBackup={onCreateBackup} />)
+
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
+
+    expect(screen.getByText('Backup required before updating.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Create backup' }))
+    await user.click(screen.getByRole('button', { name: 'Reload' }))
+
+    expect(onCreateBackup).toHaveBeenCalledTimes(1)
+    expect(hookState.value.applyUpdate).toHaveBeenCalledTimes(1)
+  })
+
   it('requires confirmation for recommended-backup releases', async () => {
     hookState.value = {
       ...hookState.value,

@@ -62,7 +62,17 @@ export function UpdateManager({ onCreateBackup }: UpdateManagerProps) {
   const updateLabel = needsReload ? 'Reload' : 'Update'
 
   const handlePrimaryAction = () => {
-    if (needsReload || !severityDecision.requiresWarningStep) {
+    if (needsReload) {
+      if (severityDecision.requiresBackup && !hasCompletedRequiredBackup) {
+        setStep('require-backup')
+        return
+      }
+
+      void applyUpdate()
+      return
+    }
+
+    if (!severityDecision.requiresWarningStep) {
       void applyUpdate()
       return
     }

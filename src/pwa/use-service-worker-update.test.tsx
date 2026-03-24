@@ -127,6 +127,30 @@ describe('useServiceWorkerUpdate', () => {
     expect(result.current.promptVisible).toBe(false)
   })
 
+  it('clears expired dismissal records and keeps prompt visible', () => {
+    window.localStorage.setItem(
+      'tally:update-dismissed',
+      JSON.stringify({
+        version: '1.2.0',
+        dismissedAt: Date.now() - 1000 * 60 * 60 * 7,
+      }),
+    )
+    registerServiceWorkerState.snapshot = {
+      ...registerServiceWorkerState.snapshot,
+      updateAvailable: true,
+      availableVersionInfo: {
+        version: '1.2.0',
+        changelog: ['Update'],
+        severity: 'minor',
+      },
+    }
+
+    const { result } = renderHook(() => useServiceWorkerUpdate())
+
+    expect(result.current.promptVisible).toBe(true)
+    expect(window.localStorage.getItem('tally:update-dismissed')).toBeNull()
+  })
+
   it('shows the prompt again when a different version arrives after a dismissal', () => {
     window.localStorage.setItem(
       'tally:update-dismissed',

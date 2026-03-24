@@ -49,6 +49,11 @@ function readDismissedUpdate(): DismissedUpdateRecord | null {
       return null
     }
 
+    if (Date.now() - parsed.dismissedAt >= DISMISS_COOLDOWN_MS) {
+      window.localStorage.removeItem(UPDATE_DISMISS_KEY)
+      return null
+    }
+
     return {
       version: parsed.version,
       dismissedAt: parsed.dismissedAt,

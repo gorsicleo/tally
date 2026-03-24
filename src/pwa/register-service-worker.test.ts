@@ -202,6 +202,46 @@ describe('registerServiceWorker', () => {
     expect(module.getServiceWorkerUpdateSnapshot().updateAvailable).toBe(true)
   })
 
+  it('ignores first controller acquisition on initial install', async () => {
+    installMockServiceWorkerContainer({ controller: null })
+
+    const activeWorker = createMockServiceWorker()
+    const registration = createMockServiceWorkerRegistration({
+      active: activeWorker as unknown as ServiceWorker,
+    })
+    registerSwState.register.mockImplementation((options: { onRegisteredSW?: (swUrl: string, registration: ServiceWorkerRegistration) => void }) => {
+      options.onRegisteredSW?.(
+        '/sw.js',
+        registration as unknown as ServiceWorkerRegistration,
+      )
+      return vi.fn()
+    })
+
+    const reloadSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        ...window.location,
+        reload: reloadSpy,
+      },
+    })
+
+    const module = await import('./register-service-worker')
+    module.resetServiceWorkerUpdateStateForTests()
+    module.registerServiceWorker()
+
+    ;(window.navigator.serviceWorker as Navigator['serviceWorker'] & {
+      dispatch: (type: string, payload?: unknown) => void
+    }).dispatch('controllerchange')
+
+    expect(reloadSpy).not.toHaveBeenCalled()
+    expect(module.getServiceWorkerUpdateSnapshot().updateAvailable).toBe(false)
+    expect(module.getServiceWorkerUpdateSnapshot().needsReload).toBe(false)
+    expect(activeWorker.postMessage).toHaveBeenCalledWith({
+      type: 'TALLY_GET_VERSION_INFO',
+    })
+  })
+
   it('reloads only after controllerchange when the user started the update flow', async () => {
     const waitingWorker = createMockServiceWorker()
     const registration = createMockServiceWorkerRegistration({
