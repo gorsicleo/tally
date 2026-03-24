@@ -1,6 +1,43 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { createSeedState } from './test-data'
 import { freezeTime, seedAppState, waitForAppReady } from './test-helpers'
+
+async function stubClipboard(page: Page) {
+  await page.addInitScript(() => {
+    ;(window as unknown as { __tallyCopiedText?: string }).__tallyCopiedText = ''
+
+    const clipboard = {
+      writeText: async (value: string) => {
+        ;(window as unknown as { __tallyCopiedText?: string }).__tallyCopiedText = value
+      },
+    }
+
+    Object.defineProperty(window.navigator, 'clipboard', {
+      configurable: true,
+      value: clipboard,
+    })
+  })
+}
+
+async function stubExternalNavigation(page: Page) {
+  await page.addInitScript(() => {
+    ;(window as unknown as { __tallyOpenedUrls?: string[] }).__tallyOpenedUrls = []
+
+    const openStub: Window['open'] = ((url?: string | URL) => {
+      const store = window as unknown as { __tallyOpenedUrls?: string[] }
+      store.__tallyOpenedUrls?.push(String(url ?? ''))
+
+      return {
+        closed: false,
+        close: () => {
+          // No-op for test stub.
+        },
+      } as unknown as Window
+    }) as Window['open']
+
+    window.open = openStub
+  })
+}
 
 test('adds a transaction from the sheet and shows it in records', async ({ page }) => {
   await freezeTime(page)
@@ -76,4 +113,83 @@ test('switches insights into charts view', async ({ page }) => {
 
   await expect(page.getByRole('img', { name: 'Monthly spending trend chart' })).toBeVisible()
   await expect(page.getByRole('img', { name: 'Top spending categories donut chart' })).toBeVisible()
+})
+
+test('shows report a bug entry and opens report bug dialog from settings', async ({ page }) => {
+  await freezeTime(page)
+  await seedAppState(page, createSeedState({ includeFoodTransaction: true }))
+
+  await page.goto('/')
+  await waitForAppReady(page)
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Report a bug' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Report a bug' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Report a bug' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByText(/Bug reports are filed on GitHub/i)).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Copy app info' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Open GitHub issue' })).toBeVisible()
+})
+
+test('copies app info from report bug dialog and shows feedback', async ({ page }) => {
+  await freezeTime(page)
+  await seedAppState(page, createSeedState({ includeFoodTransaction: true }))
+  await stubClipboard(page)
+
+  await page.goto('/')
+  await waitForAppReady(page)
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Report a bug' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Report a bug' })
+  await dialog.getByRole('button', { name: 'Copy app info' }).click()
+
+  await expect(page.getByText('App info copied.')).toBeVisible()
+
+  const copiedText = await page.evaluate(() => {
+    return (window as unknown as { __tallyCopiedText?: string }).__tallyCopiedText ?? ''
+  })
+  expect(copiedText).toContain('App: Tally')
+  expect(copiedText).toContain('Installed PWA:')
+})
+
+test('opens github issue with correct URL intent from report bug dialog', async ({ page }) => {
+  await freezeTime(page)
+  await seedAppState(page, createSeedState({ includeFoodTransaction: true }))
+  await stubExternalNavigation(page)
+
+  await page.goto('/')
+  await waitForAppReady(page)
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Report a bug' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Report a bug' })
+  await dialog.getByRole('button', { name: 'Open GitHub issue' }).click()
+
+  const openedUrls = await page.evaluate(() => {
+    return (window as unknown as { __tallyOpenedUrls?: string[] }).__tallyOpenedUrls ?? []
+  })
+  expect(openedUrls).toContain('https://github.com/gorsicleo/tally/issues/new/choose')
+})
+
+test('keeps report bug flow usable on mobile viewport', async ({ page }) => {
+  await freezeTime(page)
+  await seedAppState(page, createSeedState({ includeFoodTransaction: true }))
+  await page.setViewportSize({ width: 390, height: 844 })
+
+  await page.goto('/')
+  await waitForAppReady(page)
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Report a bug' }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Report a bug' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Open GitHub issue' })).toBeVisible()
 })

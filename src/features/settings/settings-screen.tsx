@@ -17,8 +17,17 @@ import {
 import type { Category, CategoryKind } from '../../domain/models'
 import { getVisibleManagedCategories } from '../../domain/categories'
 import { getMonthKey } from '../../domain/selectors'
+import { getCurrentAppVersionInfo } from '../../pwa/app-version'
 import { useFinance } from '../../state/use-finance'
+import { copyTextToClipboard } from '../../utils/clipboard'
 import { downloadTextFile } from '../../utils/download'
+import { openExternalUrl } from '../../utils/external-link'
+import {
+  buildCurrentBugReportInfoText,
+  GITHUB_ISSUE_CHOOSER_URL,
+  GITHUB_PROJECT_URL,
+} from './report-bug-info'
+import { ReportBugDialog } from './report-bug-dialog'
 import { SettingsBackupSection } from './settings-backup-section'
 import { SettingsCategoriesSection } from './settings-categories-section'
 import { SettingsGeneralSection } from './settings-general-section'
@@ -338,7 +347,17 @@ export function SettingsScreen({
     fileName: string
     prepared: PreparedBackupRestore
   } | null>(null)
+  const [isReportBugDialogOpen, setIsReportBugDialogOpen] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
+
+  const appVersion = useMemo(() => {
+    try {
+      const version = getCurrentAppVersionInfo().version.trim()
+      return version.length > 0 ? version : null
+    } catch {
+      return null
+    }
+  }, [])
 
   const managedCategories = useMemo(
     () => getVisibleManagedCategories(state.categories),
@@ -467,6 +486,38 @@ export function SettingsScreen({
     if (!didCreateBackup) {
       setBackupMessage({ tone: 'error', text: 'Backup could not be downloaded.' })
     }
+  }
+
+  const handleCopyBugReportInfo = async () => {
+    const reportInfoText = buildCurrentBugReportInfoText()
+    const didCopy = await copyTextToClipboard(reportInfoText)
+
+    if (didCopy) {
+      onShowToast('App info copied.')
+      return
+    }
+
+    onShowToast('Could not copy app info.')
+  }
+
+  const handleOpenExternalLink = (
+    url: string,
+    successCallback?: () => void,
+  ) => {
+    const didOpen = openExternalUrl(url)
+
+    if (!didOpen) {
+      onShowToast('Could not open GitHub. Please try again.')
+      return
+    }
+
+    successCallback?.()
+  }
+
+  const handleOpenGithubIssue = async () => {
+    handleOpenExternalLink(GITHUB_ISSUE_CHOOSER_URL, () => {
+      setIsReportBugDialogOpen(false)
+    })
   }
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -741,6 +792,50 @@ export function SettingsScreen({
             </div>
           </div>
 
+          <div className="settings-group">
+            <p className="settings-group-title">Help & Feedback</p>
+
+            <div className="settings-group-list">
+              <button
+                type="button"
+                className="settings-list-row settings-action-row"
+                onClick={() => setIsReportBugDialogOpen(true)}
+              >
+                <div className="settings-row-copy">
+                  <span className="settings-row-label">Report a bug</span>
+                  <span className="settings-row-caption">Open GitHub to file an issue</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="settings-list-row settings-action-row"
+                onClick={() => handleOpenExternalLink(GITHUB_ISSUE_CHOOSER_URL)}
+              >
+                <div className="settings-row-copy">
+                  <span className="settings-row-label">Request a feature</span>
+                  <span className="settings-row-caption">Open GitHub issue templates</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                className="settings-list-row settings-action-row"
+                onClick={() => handleOpenExternalLink(GITHUB_PROJECT_URL)}
+              >
+                <div className="settings-row-copy">
+                  <span className="settings-row-label">View GitHub project</span>
+                  <span className="settings-row-caption">Browse issues and roadmap</span>
+                </div>
+              </button>
+
+              <div className="settings-list-row" aria-label="App version">
+                <span className="settings-row-label">App version</span>
+                <span className="settings-row-value">{appVersion ?? 'Unknown'}</span>
+              </div>
+            </div>
+          </div>
+
         </section>
       ) : view === 'categories' ? (
         <SettingsCategoriesSection
@@ -790,6 +885,15 @@ export function SettingsScreen({
           exportedAtLabel={formatDateTimeLabel(pendingRestore.prepared.payload.exportedAt)}
           onCancel={() => setPendingRestore(null)}
           onConfirm={handleConfirmRestore}
+        />
+      ) : null}
+
+      {isReportBugDialogOpen ? (
+        <ReportBugDialog
+          appVersion={appVersion}
+          onCancel={() => setIsReportBugDialogOpen(false)}
+          onCopyAppInfo={handleCopyBugReportInfo}
+          onOpenGithubIssue={handleOpenGithubIssue}
         />
       ) : null}
     </div>
