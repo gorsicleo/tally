@@ -118,6 +118,20 @@ function getCompatibleCategories(
   )
 }
 
+function parseAmountInput(value: string): number {
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return Number.NaN
+  }
+
+  if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(trimmedValue)) {
+    return Number.NaN
+  }
+
+  return Number(trimmedValue.replace(',', '.'))
+}
+
 export function TransactionEditorSheet({
   mode,
   categories,
@@ -311,7 +325,7 @@ export function TransactionEditorSheet({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    const numericAmount = Number(amount)
+    const numericAmount = parseAmountInput(amount)
 
     if (!selectedCategoryId) {
       setError('Create a matching category first.')
@@ -430,10 +444,9 @@ export function TransactionEditorSheet({
           <div className="sheet-amount-field">
             <input
               ref={amountInputRef}
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="0"
-              step="0.01"
+              pattern="[0-9]*[.,]?[0-9]*"
               value={amount}
               onChange={(event) => {
                 setAmount(event.target.value)

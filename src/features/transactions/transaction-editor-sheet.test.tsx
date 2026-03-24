@@ -108,8 +108,9 @@ describe('TransactionEditorSheet', () => {
     })
     await user.click(screen.getByRole('button', { name: /Repeat/i }))
     await user.click(screen.getByRole('button', { name: 'Custom' }))
-    await user.clear(screen.getByLabelText('Repeat every how many days?'))
-    await user.type(screen.getByLabelText('Repeat every how many days?'), '10')
+    fireEvent.change(screen.getByLabelText('Repeat every how many days?'), {
+      target: { value: '10' },
+    })
     fireEvent.change(screen.getByLabelText('Start date'), {
       target: { value: '2026-03-25' },
     })
@@ -161,6 +162,27 @@ describe('TransactionEditorSheet', () => {
         categoryId: 'cat-fun',
         note: 'Movie night',
         occurredAt: '2026-03-22',
+      },
+      null,
+    )
+  })
+
+  it('accepts a comma as the decimal separator', async () => {
+    const { user, onCreate } = renderSheet()
+
+    fireEvent.change(screen.getByLabelText('Amount'), {
+      target: { value: '42,5' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(onCreate).toHaveBeenCalledWith(
+      {
+        type: 'expense',
+        amount: 42.5,
+        categoryId: 'cat-food',
+        note: '',
+        occurredAt: getTodayLocalDate(),
       },
       null,
     )
