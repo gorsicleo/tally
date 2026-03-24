@@ -49,7 +49,6 @@ function createLoadedState(overrides: Partial<FinanceState> = {}): FinanceState 
     transactions: [],
     budgets: [],
     recurringTemplates: [],
-    syncQueue: [],
     settings: {
       ...initialFinanceState.settings,
       hasSeenPrivacyModal: true,
@@ -79,7 +78,6 @@ function createTransaction(overrides: Partial<Transaction>): Transaction {
     recurringOccurrenceDate: overrides.recurringOccurrenceDate ?? null,
     createdAt: overrides.createdAt ?? '2026-03-20T08:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-03-20T08:00:00.000Z',
-    syncStatus: overrides.syncStatus ?? 'synced',
   }
 }
 
@@ -99,7 +97,6 @@ function createRecurringTemplate(
     active: overrides.active ?? true,
     createdAt: overrides.createdAt ?? '2026-03-01T08:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-03-01T08:00:00.000Z',
-    syncStatus: overrides.syncStatus ?? 'synced',
   }
 }
 
@@ -154,7 +151,6 @@ describe('App UI behavior', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-20T09:00:00.000Z',
           updatedAt: '2026-03-20T09:00:00.000Z',
-          syncStatus: 'synced',
         },
         {
           id: 'txn-pay',
@@ -167,7 +163,6 @@ describe('App UI behavior', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-19T09:00:00.000Z',
           updatedAt: '2026-03-19T09:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })
@@ -204,7 +199,6 @@ describe('App UI behavior', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-20T09:00:00.000Z',
           updatedAt: '2026-03-20T09:00:00.000Z',
-          syncStatus: 'synced',
         },
         {
           id: 'txn-expense',
@@ -217,7 +211,6 @@ describe('App UI behavior', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-20T10:00:00.000Z',
           updatedAt: '2026-03-20T10:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })
@@ -244,7 +237,6 @@ describe('App UI behavior', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-20T09:00:00.000Z',
           updatedAt: '2026-03-20T09:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })

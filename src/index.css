@@ -426,8 +426,7 @@ textarea {
 .ghost-button:hover,
 .submit-button:hover,
 .row-action-button:hover,
-.icon-button:hover,
-.theme-toggle:hover {
+.icon-button:hover {
   transform: translateY(-1px);
 }
 
@@ -437,62 +436,6 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-.theme-toggle {
-  position: relative;
-  width: 54px;
-  height: 54px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.theme-toggle-orbit {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.theme-toggle[data-theme='dark'] .theme-toggle-orbit {
-  transform: rotate(180deg);
-}
-
-.theme-icon {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 24px;
-  height: 24px;
-  transition:
-    opacity 0.35s ease,
-    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.sun-icon {
-  color: #ffd55c;
-  opacity: 1;
-  transform: scale(1) rotate(0deg);
-}
-
-.moon-icon {
-  color: #dfe6ff;
-  opacity: 0;
-  transform: scale(0.35) rotate(-120deg);
-}
-
-.theme-toggle[data-theme='dark'] .sun-icon {
-  opacity: 0;
-  transform: scale(0.35) rotate(120deg);
-}
-
-.theme-toggle[data-theme='dark'] .moon-icon {
-  opacity: 1;
-  transform: scale(1) rotate(0deg);
 }
 
 .app-main {
@@ -1442,11 +1385,6 @@ button.settings-category-row:hover {
   min-width: 88px;
   max-width: 140px;
   padding: 9px 10px;
-}
-
-.settings-control-row .theme-toggle {
-  width: 48px;
-  height: 48px;
 }
 
 .settings-sync-actions,

@@ -12,15 +12,17 @@ import { RestoreBackupDialog } from '../backup/backup-ui'
 import type { CategoryDeletionStrategy } from '../../domain/category-service'
 import { exportTransactionsAsCsv } from '../../domain/exporters'
 import {
-  getRecurringFrequencyLabel,
-  getRecurringTemplateLabel,
-} from '../../domain/recurring'
-import { formatCurrency, formatDateTimeLabel, formatLongDateLabel } from '../../domain/formatters'
+  formatDateTimeLabel,
+} from '../../domain/formatters'
 import type { Category, CategoryKind } from '../../domain/models'
 import { getVisibleManagedCategories } from '../../domain/categories'
 import { getMonthKey } from '../../domain/selectors'
 import { useFinance } from '../../state/use-finance'
 import { downloadTextFile } from '../../utils/download'
+import { SettingsBackupSection } from './settings-backup-section'
+import { SettingsCategoriesSection } from './settings-categories-section'
+import { SettingsGeneralSection } from './settings-general-section'
+import { SettingsRecurringSection } from './settings-recurring-section'
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'CZK']
 const CATEGORY_SHEET_CLOSE_MS = 280
@@ -650,134 +652,27 @@ export function SettingsScreen({
     <div className="screen-stack settings-screen">
       {view === 'main' ? (
         <section className="panel settings-list-panel">
-          <div className="settings-group">
-            <p className="settings-group-title">General</p>
+          <SettingsGeneralSection
+            currency={state.settings.currency}
+            currencyOptions={currencyOptions}
+            theme={state.settings.theme}
+            onCurrencyChange={(currency) => setCurrency(currency)}
+            onThemeChange={(theme) => setTheme(theme)}
+          />
 
-            <div className="settings-group-list">
-              <label className="settings-list-row settings-control-row">
-                <span className="settings-row-label">Currency</span>
-                <select
-                  value={state.settings.currency}
-                  onChange={(event) => setCurrency(event.target.value)}
-                >
-                  {currencyOptions.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="settings-list-row settings-control-row">
-                <span className="settings-row-label">Theme</span>
-                <div className="settings-inline-switch" role="group" aria-label="Theme">
-                  <button
-                    type="button"
-                    className={state.settings.theme === 'auto' ? 'active' : ''}
-                    onClick={() => setTheme('auto')}
-                  >
-                    Auto
-                  </button>
-                  <button
-                    type="button"
-                    className={state.settings.theme === 'light' ? 'active' : ''}
-                    onClick={() => setTheme('light')}
-                  >
-                    Light
-                  </button>
-                  <button
-                    type="button"
-                    className={state.settings.theme === 'dark' ? 'active' : ''}
-                    onClick={() => setTheme('dark')}
-                  >
-                    Dark
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="settings-group">
-            <p className="settings-group-title">Backup &amp; Restore</p>
-
-            <div className="settings-group-list">
-              <div className="settings-list-row">
-                <span className="settings-row-label">Last backup</span>
-                <span className="settings-row-value">
-                  {formatDateTimeLabel(state.settings.lastBackupAt)}
-                </span>
-              </div>
-
-              <div className="settings-list-row settings-backup-toggle-row">
-                <div className="settings-row-copy">
-                  <span className="settings-row-label">Backup reminders</span>
-                  <span className="settings-row-caption">
-                    {state.settings.backupRemindersEnabled ? 'On' : 'Off'}
-                  </span>
-                </div>
-
-                <div className="settings-inline-switch" role="group" aria-label="Backup reminders">
-                  <button
-                    type="button"
-                    className={state.settings.backupRemindersEnabled ? 'active' : ''}
-                    onClick={() => {
-                      updateBackupSettings({ backupRemindersEnabled: true })
-                    }}
-                  >
-                    On
-                  </button>
-                  <button
-                    type="button"
-                    className={!state.settings.backupRemindersEnabled ? 'active' : ''}
-                    onClick={() => {
-                      updateBackupSettings({ backupRemindersEnabled: false })
-                    }}
-                  >
-                    Off
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="settings-backup-actions">
-              <button
-                type="button"
-                className="submit-button compact"
-                onClick={() => {
-                  void handleCreateBackup()
-                }}
-              >
-                Create backup
-              </button>
-
-              <button
-                type="button"
-                className="ghost-button compact"
-                onClick={() => importInputRef.current?.click()}
-              >
-                Restore backup
-              </button>
-            </div>
-
-            <input
-              ref={importInputRef}
-              className="settings-import-input"
-              type="file"
-              aria-label="Restore backup file"
-              accept=".json,application/json"
-              onChange={handleImport}
-            />
-
-            <p className="support-copy settings-backup-help">
-              Backup files contain sensitive financial data. Store them securely.
-            </p>
-
-            {backupMessage ? (
-              <p className={backupMessage.tone === 'error' ? 'inline-error' : 'support-copy'}>
-                {backupMessage.text}
-              </p>
-            ) : null}
-          </div>
+          <SettingsBackupSection
+            lastBackupLabel={formatDateTimeLabel(state.settings.lastBackupAt)}
+            backupRemindersEnabled={state.settings.backupRemindersEnabled}
+            backupMessage={backupMessage}
+            importInputRef={importInputRef}
+            onToggleBackupReminders={(enabled) => {
+              updateBackupSettings({ backupRemindersEnabled: enabled })
+            }}
+            onCreateBackup={() => {
+              void handleCreateBackup()
+            }}
+            onImport={handleImport}
+          />
 
           <div className="settings-group">
             <p className="settings-group-title">Data</p>
@@ -848,132 +743,21 @@ export function SettingsScreen({
 
         </section>
       ) : view === 'categories' ? (
-        <section className="panel settings-list-panel">
-          <div className="settings-categories-header">
-            <button
-              type="button"
-              className="ghost-button compact"
-              onClick={() => setView('main')}
-            >
-              Back
-            </button>
-
-            <div>
-              <p className="eyebrow">CATEGORIES</p>
-              <h3>Manage categories</h3>
-              <p>Tap a row to edit. Deletion now supports reassignment or Uncategorized fallback.</p>
-            </div>
-
-            <button
-              type="button"
-              className="submit-button compact"
-              onClick={() => openCategoryEditor('create')}
-            >
-              + Add
-            </button>
-          </div>
-
-          <div className="settings-group-list settings-category-list-panel">
-            {sortedCategories.map((category) => {
-              const linkedCount = linkedTransactionsByCategoryId.get(category.id) ?? 0
-
-              return (
-                <button
-                  key={category.id}
-                  type="button"
-                  className="settings-category-row"
-                  onClick={() => openCategoryEditor(category.id)}
-                >
-                  <div className="settings-category-main">
-                    <span
-                      className="chip-dot"
-                      aria-hidden="true"
-                      style={{ backgroundColor: category.color }}
-                    />
-
-                    <div className="settings-category-info">
-                      <strong>{category.name}</strong>
-                      <span className="settings-category-kind">{category.kind}</span>
-                    </div>
-                  </div>
-
-                  <div className="settings-category-meta">
-                    <span className="settings-category-count">{linkedCount} linked</span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
+        <SettingsCategoriesSection
+          sortedCategories={sortedCategories}
+          linkedTransactionsByCategoryId={linkedTransactionsByCategoryId}
+          onBack={() => setView('main')}
+          onAddCategory={() => openCategoryEditor('create')}
+          onEditCategory={(categoryId) => openCategoryEditor(categoryId)}
+        />
       ) : (
-        <section className="panel settings-list-panel">
-          <div className="settings-categories-header">
-            <button
-              type="button"
-              className="ghost-button compact"
-              onClick={() => setView('main')}
-            >
-              Back
-            </button>
-
-            <div>
-              <p className="eyebrow">RECURRING</p>
-              <h3>Recurring transactions</h3>
-              <p>Manage future occurrences without changing past records.</p>
-            </div>
-
-            <span className="micro-badge subtle">
-              {activeRecurringTemplates.length} active
-            </span>
-          </div>
-
-          {activeRecurringTemplates.length === 0 ? (
-            <p className="empty-state">
-              Recurring items you create will appear here for future editing.
-            </p>
-          ) : (
-            <div className="settings-group-list settings-category-list-panel">
-              {activeRecurringTemplates.map((template) => {
-                const category = state.categories.find(
-                  (entry) => entry.id === template.categoryId,
-                )
-
-                return (
-                  <button
-                    key={template.id}
-                    type="button"
-                    className="settings-category-row"
-                    onClick={() => onOpenRecurringEditor(template.id)}
-                  >
-                    <div className="settings-category-main">
-                      <span
-                        className="chip-dot"
-                        aria-hidden="true"
-                        style={{ backgroundColor: category?.color ?? 'var(--accent)' }}
-                      />
-
-                      <div className="settings-category-info">
-                        <strong>
-                          {getRecurringTemplateLabel(template, category?.name)}
-                        </strong>
-                        <span className="settings-category-kind">
-                          {getRecurringFrequencyLabel(template)} · due {formatLongDateLabel(template.nextDueDate)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="settings-category-meta recurring-settings-meta">
-                      <span className="micro-badge subtle">{template.type}</span>
-                      <strong className="settings-row-value">
-                        {formatCurrency(template.amount, state.settings.currency)}
-                      </strong>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </section>
+        <SettingsRecurringSection
+          activeRecurringTemplates={activeRecurringTemplates}
+          categories={state.categories}
+          currency={state.settings.currency}
+          onBack={() => setView('main')}
+          onOpenRecurringEditor={onOpenRecurringEditor}
+        />
       )}
 
       {editingCategoryId ? (

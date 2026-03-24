@@ -15,7 +15,6 @@ function createTransaction(overrides: Partial<Transaction>): Transaction {
     recurringOccurrenceDate: overrides.recurringOccurrenceDate ?? null,
     createdAt: overrides.createdAt ?? '2026-03-20T10:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-03-20T10:00:00.000Z',
-    syncStatus: overrides.syncStatus ?? 'synced',
   }
 }
 
@@ -31,7 +30,7 @@ describe('exportTransactionsAsCsv', () => {
   it('returns only header when there are no transactions', () => {
     const csv = exportTransactionsAsCsv(createState([]))
 
-    expect(csv).toBe('id,type,amount,category,note,occurredAt,syncStatus,updatedAt')
+    expect(csv).toBe('id,type,amount,category,note,occurredAt,updatedAt')
   })
 
   it('sorts transactions by occurredAt descending and then by createdAt descending', () => {

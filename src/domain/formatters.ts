@@ -1,3 +1,5 @@
+import { createLocalNoonDate } from '../utils/date'
+
 const currencyFormatters = new Map<string, Intl.NumberFormat>()
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -65,15 +67,15 @@ export function formatCurrency(value: number, currency = 'USD'): string {
 }
 
 export function formatDateLabel(isoDate: string): string {
-  return dateFormatter.format(new Date(`${isoDate}T12:00:00`))
+  return dateFormatter.format(createLocalNoonDate(isoDate))
 }
 
 export function formatLongDateLabel(isoDate: string): string {
-  return longDateFormatter.format(new Date(`${isoDate}T12:00:00`))
+  return longDateFormatter.format(createLocalNoonDate(isoDate))
 }
 
 export function formatCompactDateLabel(isoDate: string): string {
-  return compactDateFormatter.format(new Date(`${isoDate}T12:00:00`))
+  return compactDateFormatter.format(createLocalNoonDate(isoDate))
 }
 
 export function formatDateTimeLabel(value: string | null): string {

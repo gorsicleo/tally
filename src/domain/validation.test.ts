@@ -14,7 +14,6 @@ describe('parsePersistedFinanceState', () => {
           isDefault: true,
           createdAt: '2026-03-01T10:00:00.000Z',
           updatedAt: '2026-03-01T10:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       transactions: [
@@ -27,20 +26,13 @@ describe('parsePersistedFinanceState', () => {
           occurredAt: '2026-03-01',
           createdAt: '2026-03-01T11:00:00.000Z',
           updatedAt: '2026-03-01T11:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       budgets: [],
-      syncQueue: [],
       settings: {
         theme: 'dark',
         currency: 'USD',
-        syncEndpoint: 'demo://local',
-        conflictPolicy: 'client-wins',
       },
-      lastSyncedAt: null,
-      lastSyncAttemptAt: null,
-      lastSyncError: null,
     }
 
     const parsedState = parsePersistedFinanceState(legacyState)
@@ -67,7 +59,6 @@ describe('parsePersistedFinanceState', () => {
           isDefault: true,
           createdAt: '2026-03-01T10:00:00.000Z',
           updatedAt: '2026-03-01T10:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       transactions: [],
@@ -79,20 +70,13 @@ describe('parsePersistedFinanceState', () => {
           limit: 200,
           createdAt: '2026-03-01T10:00:00.000Z',
           updatedAt: '2026-03-01T10:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       recurringTemplates: [],
-      syncQueue: [],
       settings: {
         theme: 'dark',
         currency: 'USD',
-        syncEndpoint: 'demo://local',
-        conflictPolicy: 'client-wins',
       },
-      lastSyncedAt: null,
-      lastSyncAttemptAt: null,
-      lastSyncError: null,
     }
 
     const parsedState = parsePersistedFinanceState(legacyState)
@@ -115,7 +99,6 @@ describe('parsePersistedFinanceState', () => {
           system: null,
           createdAt: '2026-03-01T10:00:00.000Z',
           updatedAt: '2026-03-01T10:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       transactions: [
@@ -130,7 +113,6 @@ describe('parsePersistedFinanceState', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-01T11:00:00.000Z',
           updatedAt: '2026-03-01T11:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       budgets: [],
@@ -148,19 +130,12 @@ describe('parsePersistedFinanceState', () => {
           active: true,
           createdAt: '2026-03-01T11:00:00.000Z',
           updatedAt: '2026-03-01T11:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
-      syncQueue: [],
       settings: {
         theme: 'dark',
         currency: 'USD',
-        syncEndpoint: 'demo://local',
-        conflictPolicy: 'client-wins',
       },
-      lastSyncedAt: null,
-      lastSyncAttemptAt: null,
-      lastSyncError: null,
     }
 
     const parsedState = parsePersistedFinanceState(legacyState)

@@ -23,7 +23,6 @@ function createState(overrides: Partial<FinanceState> = {}): FinanceState {
     transactions: [],
     budgets: [],
     recurringTemplates: [],
-    syncQueue: [],
     settings: {
       ...initialFinanceState.settings,
       hasSeenPrivacyModal: true,
@@ -74,12 +73,8 @@ function FinanceProbe({ replacementState }: { replacementState: FinanceState }) 
   return (
     <>
       <div data-testid="loaded">{String(finance.isLoaded)}</div>
-      <div data-testid="online">{String(finance.isOnline)}</div>
       <div data-testid="currency">{finance.state.settings.currency}</div>
       <div data-testid="categories">{finance.state.categories.length}</div>
-      <div data-testid="queue">{finance.state.syncQueue.length}</div>
-      <div data-testid="last-sync-attempt">{finance.state.lastSyncAttemptAt ?? 'none'}</div>
-      <div data-testid="last-synced">{finance.state.lastSyncedAt ?? 'none'}</div>
 
       <button type="button" onClick={() => finance.setTheme('auto')}>
         Set auto theme
@@ -124,7 +119,7 @@ describe('FinanceProvider integration', () => {
     vi.unstubAllGlobals()
   })
 
-  it('hydrates stored state, applies auto theme, and reacts to connectivity changes', async () => {
+  it('hydrates stored state and applies auto theme', async () => {
     const storedState = createState({
       settings: {
         ...initialFinanceState.settings,
@@ -159,21 +154,6 @@ describe('FinanceProvider integration', () => {
       expect(document.documentElement.style.colorScheme).toBe('light')
     })
 
-    act(() => {
-      window.dispatchEvent(new Event('offline'))
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('online')).toHaveTextContent('false')
-    })
-
-    act(() => {
-      window.dispatchEvent(new Event('online'))
-    })
-
-    await waitFor(() => {
-      expect(screen.getByTestId('online')).toHaveTextContent('true')
-    })
   })
 
   it('persists state updates and replaceState writes the replacement snapshot', async () => {
@@ -195,7 +175,6 @@ describe('FinanceProvider integration', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-22T08:00:00.000Z',
           updatedAt: '2026-03-22T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })
@@ -236,7 +215,7 @@ describe('FinanceProvider integration', () => {
     })
   })
 
-  it('auto-syncs queued operations after local mutations', async () => {
+  it('applies local mutations and persists changes', async () => {
     const user = userEvent.setup()
     const replacementState = createState()
 
@@ -256,9 +235,7 @@ describe('FinanceProvider integration', () => {
       expect(screen.getByTestId('categories')).toHaveTextContent(
         String(initialFinanceState.categories.length + 1),
       )
-      expect(screen.getByTestId('queue')).toHaveTextContent('0')
-      expect(screen.getByTestId('last-sync-attempt')).not.toHaveTextContent('none')
-      expect(screen.getByTestId('last-synced')).not.toHaveTextContent('none')
+      expect(storageMocks.saveFinanceState).toHaveBeenCalled()
     })
   })
 })

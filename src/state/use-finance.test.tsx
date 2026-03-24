@@ -18,8 +18,6 @@ describe('useFinance', () => {
         value={{
           state: initialFinanceState,
           isLoaded: true,
-          isOnline: true,
-          isSyncing: false,
           addCategory: () => {},
           updateCategory: () => {},
           previewCategoryDeletion: () => ({ ok: false, message: 'noop' }),
@@ -36,10 +34,8 @@ describe('useFinance', () => {
           removeBudget: () => {},
           setTheme: () => {},
           setCurrency: () => {},
-          setSyncEndpoint: () => {},
           updateBackupSettings: () => {},
           replaceState: async () => {},
-          syncNow: async () => true,
         }}
       >
         {children}

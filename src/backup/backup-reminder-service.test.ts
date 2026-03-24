@@ -19,7 +19,6 @@ function createReminderState(): FinanceState {
         system: null,
         createdAt: '2026-03-01T08:00:00.000Z',
         updatedAt: '2026-03-01T08:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     transactions: [
@@ -34,7 +33,6 @@ function createReminderState(): FinanceState {
         recurringOccurrenceDate: null,
         createdAt: '2026-03-15T12:00:00.000Z',
         updatedAt: '2026-03-15T12:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     recurringTemplates: [],
@@ -133,7 +131,6 @@ describe('evaluateBackupReminder', () => {
             active: true,
             createdAt: '2026-03-01T08:00:00.000Z',
             updatedAt: '2026-03-01T08:00:00.000Z',
-            syncStatus: 'synced',
           },
         ],
         settings: {

@@ -87,7 +87,6 @@ describe('SettingsScreen direct flows', () => {
             active: true,
             createdAt: '2026-03-01T08:00:00.000Z',
             updatedAt: '2026-03-01T08:00:00.000Z',
-            syncStatus: 'synced',
           },
         ],
       }),
@@ -134,7 +133,6 @@ describe('SettingsScreen direct flows', () => {
             recurringOccurrenceDate: null,
             createdAt: '2026-03-20T08:00:00.000Z',
             updatedAt: '2026-03-20T08:00:00.000Z',
-            syncStatus: 'synced',
           },
         ],
       }),
@@ -168,7 +166,6 @@ describe('SettingsScreen direct flows', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-20T08:00:00.000Z',
           updatedAt: '2026-03-20T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       recurringTemplates: [
@@ -185,7 +182,6 @@ describe('SettingsScreen direct flows', () => {
           active: true,
           createdAt: '2026-03-01T08:00:00.000Z',
           updatedAt: '2026-03-01T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
       budgets: [
@@ -197,7 +193,6 @@ describe('SettingsScreen direct flows', () => {
           limit: 200,
           createdAt: '2026-03-01T08:00:00.000Z',
           updatedAt: '2026-03-01T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })
@@ -260,7 +255,6 @@ describe('SettingsScreen direct flows', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-20T08:00:00.000Z',
           updatedAt: '2026-03-20T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     })

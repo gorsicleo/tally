@@ -411,14 +411,3 @@ export function getComparisonOverview(
   }
 }
 
-export function getSyncSummary(state: FinanceState) {
-  return {
-    queued: state.syncQueue.length,
-    pending: state.syncQueue.length,
-    failed:
-      state.transactions.filter((transaction) => transaction.syncStatus === 'failed')
-        .length +
-      state.categories.filter((category) => category.syncStatus === 'failed').length +
-      state.budgets.filter((budget) => budget.syncStatus === 'failed').length,
-  }
-}

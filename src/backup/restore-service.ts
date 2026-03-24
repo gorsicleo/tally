@@ -28,16 +28,12 @@ function buildRestoredState(payload: TallyBackupPayload): FinanceState {
     transactions: cloneItems(payload.data.transactions),
     budgets: cloneItems(payload.data.budgets),
     recurringTemplates: cloneItems(payload.data.recurringTemplates),
-    syncQueue: [],
     settings: {
       ...payload.data.preferences,
       lastBackupAt: payload.data.preferences.lastBackupAt ?? payload.exportedAt,
       changesSinceBackup: 0,
       lastReminderAt: null,
     },
-    lastSyncedAt: null,
-    lastSyncAttemptAt: null,
-    lastSyncError: null,
   }
 }
 
@@ -87,11 +83,7 @@ export function validateBackupPayload(value: unknown): BackupParseResult {
       value.schemaVersion === BACKUP_SCHEMA_VERSION
         ? value.data.recurringTemplates
         : [],
-    syncQueue: [],
     settings: value.data.preferences,
-    lastSyncedAt: null,
-    lastSyncAttemptAt: null,
-    lastSyncError: null,
   })
 
   if (!candidateState) {

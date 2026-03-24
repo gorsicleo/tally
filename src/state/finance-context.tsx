@@ -37,14 +37,6 @@ import {
 export function FinanceProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(financeReducer, initialFinanceState)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [isOnline, setIsOnline] = useState<boolean>(() => {
-    if (typeof navigator === 'undefined') {
-      return false
-    }
-
-    return navigator.onLine
-  })
-  const [isSyncing, setIsSyncing] = useState(false)
   const stateRef = useRef(state)
 
   useEffect(() => {
@@ -123,24 +115,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     }
   }, [state.settings.theme])
 
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true)
-    }
-
-    const handleOffline = () => {
-      setIsOnline(false)
-    }
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
-
   const addCategory = useCallback((input: AddCategoryInput) => {
     const timestamp = new Date().toISOString()
 
@@ -154,7 +128,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         system: null,
         createdAt: timestamp,
         updatedAt: timestamp,
-        syncStatus: 'pending',
       },
     })
   }, [])
@@ -176,7 +149,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         color: input.color,
         kind: input.kind,
         updatedAt: new Date().toISOString(),
-        syncStatus: 'pending',
       },
     })
   }, [])
@@ -221,7 +193,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         recurringOccurrenceDate: input.recurringOccurrenceDate ?? null,
         createdAt: timestamp,
         updatedAt: timestamp,
-        syncStatus: 'pending',
       },
     })
   }, [])
@@ -251,7 +222,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
           existingTransaction.recurringOccurrenceDate ??
           null,
         updatedAt: new Date().toISOString(),
-        syncStatus: 'pending',
       },
     })
   }, [])
@@ -296,7 +266,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
           active: true,
           createdAt: timestamp,
           updatedAt: timestamp,
-          syncStatus: 'synced',
         },
       })
 
@@ -381,7 +350,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
             recurringOccurrenceDate: occurrenceDate,
             createdAt: timestamp,
             updatedAt: timestamp,
-            syncStatus: 'pending',
           })),
           nextDueDate: advanceRecurringNextDueDate(
             template,
@@ -475,7 +443,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         limit: input.limit,
         createdAt: existingBudget?.createdAt ?? timestamp,
         updatedAt: timestamp,
-        syncStatus: 'pending',
       },
     })
 
@@ -497,13 +464,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
-  const setSyncEndpoint = useCallback((endpoint: string) => {
-    dispatch({
-      type: 'update-settings',
-      payload: { syncEndpoint: endpoint.trim() },
-    })
-  }, [])
-
   const updateBackupSettings = useCallback(
     (settings: Partial<BackupPreferences>) => {
       dispatch({ type: 'update-settings', payload: settings })
@@ -517,52 +477,10 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'replace-state', payload: nextState })
   }, [])
 
-  const syncNow = useCallback(async () => {
-    if (isSyncing) {
-      return false
-    }
-
-    const currentState = stateRef.current
-    const synchronizedAt = new Date().toISOString()
-
-    dispatch({ type: 'sync-attempt', payload: { at: synchronizedAt } })
-
-    if (currentState.syncQueue.length === 0) {
-      dispatch({ type: 'sync-success', payload: { at: synchronizedAt, operationIds: [] } })
-      return true
-    }
-
-    setIsSyncing(true)
-
-    try {
-      dispatch({
-        type: 'sync-success',
-        payload: {
-          at: synchronizedAt,
-          operationIds: currentState.syncQueue.map((operation) => operation.id),
-        },
-      })
-
-      return true
-    } finally {
-      setIsSyncing(false)
-    }
-  }, [isSyncing])
-
-  useEffect(() => {
-    if (!isLoaded || state.syncQueue.length === 0) {
-      return
-    }
-
-    void syncNow()
-  }, [isLoaded, state.syncQueue.length, syncNow])
-
   const value = useMemo(
     () => ({
       state,
       isLoaded,
-      isOnline,
-      isSyncing,
       addCategory,
       updateCategory,
       previewCategoryDeletion,
@@ -579,16 +497,12 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       removeBudget,
       setTheme,
       setCurrency,
-      setSyncEndpoint,
       updateBackupSettings,
       replaceState,
-      syncNow,
     }),
     [
       state,
       isLoaded,
-      isOnline,
-      isSyncing,
       addCategory,
       updateCategory,
       previewCategoryDeletion,
@@ -605,10 +519,8 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       removeBudget,
       setTheme,
       setCurrency,
-      setSyncEndpoint,
       updateBackupSettings,
       replaceState,
-      syncNow,
     ],
   )
 

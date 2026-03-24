@@ -15,8 +15,6 @@ import type {
   FinanceState,
   RecurringTemplate,
   RecurringFrequency,
-  SyncQueueItem,
-  SyncStatus,
   ThemeMode,
   Transaction,
   TransactionType,
@@ -34,7 +32,6 @@ interface ParsedBudgetCandidate {
   id: string
   createdAt: string
   updatedAt: string
-  syncStatus: SyncStatus
   name: string
   categoryIds: string[]
   monthKey: string
@@ -73,10 +70,6 @@ function isThemeMode(value: unknown): value is ThemeMode {
   return value === 'dark' || value === 'light' || value === 'auto'
 }
 
-function isSyncStatus(value: unknown): value is SyncStatus {
-  return value === 'synced' || value === 'pending' || value === 'failed'
-}
-
 function isCategoryKind(value: unknown): value is CategoryKind {
   return value === 'income' || value === 'expense' || value === 'both'
 }
@@ -92,7 +85,6 @@ function hasBaseEntityFields(value: unknown): value is {
   id: string
   createdAt: string
   updatedAt: string
-  syncStatus: SyncStatus
 } & Record<string, unknown> {
   if (!isRecord(value)) {
     return false
@@ -101,8 +93,7 @@ function hasBaseEntityFields(value: unknown): value is {
   return (
     isString(value.id) &&
     isString(value.createdAt) &&
-    isString(value.updatedAt) &&
-    isSyncStatus(value.syncStatus)
+    isString(value.updatedAt)
   )
 }
 
@@ -133,7 +124,6 @@ function parseCategory(value: unknown): Category | null {
     id: value.id,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    syncStatus: value.syncStatus,
     name: value.name,
     color: value.color,
     kind: value.kind,
@@ -184,7 +174,6 @@ function parseTransaction(
     id: value.id,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    syncStatus: value.syncStatus,
     type: value.type,
     amount: value.amount,
     categoryId: value.categoryId,
@@ -241,7 +230,6 @@ function parseBudgetCandidate(value: unknown): ParsedBudgetCandidate | null {
     id: value.id,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    syncStatus: value.syncStatus,
     name,
     categoryIds,
     monthKey: value.monthKey,
@@ -271,7 +259,6 @@ function buildBudgetFromCandidate(
     id: candidate.id,
     createdAt: candidate.createdAt,
     updatedAt: candidate.updatedAt,
-    syncStatus: candidate.syncStatus,
     name: candidate.name || fallbackName,
     categoryIds,
     monthKey: candidate.monthKey,
@@ -318,7 +305,6 @@ function parseRecurringTemplate(value: unknown): RecurringTemplate | null {
     id: value.id,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
-    syncStatus: value.syncStatus,
     type: value.type,
     amount: value.amount,
     categoryId: value.categoryId,
@@ -368,8 +354,6 @@ function isAppSettings(value: unknown): value is AppSettings {
     isThemeMode(value.theme) &&
     isString(value.currency) &&
     value.currency.length === 3 &&
-    isString(value.syncEndpoint) &&
-    value.conflictPolicy === 'client-wins' &&
     typeof value.hasSeenPrivacyModal === 'boolean' &&
     typeof value.backupRemindersEnabled === 'boolean' &&
     (value.lastBackupAt === null || isString(value.lastBackupAt)) &&
@@ -389,9 +373,7 @@ function parseAppSettings(
   if (
     !isThemeMode(value.theme) ||
     !isString(value.currency) ||
-    value.currency.length !== 3 ||
-    !isString(value.syncEndpoint) ||
-    value.conflictPolicy !== 'client-wins'
+    value.currency.length !== 3
   ) {
     return null
   }
@@ -437,112 +419,12 @@ function parseAppSettings(
   return {
     theme: value.theme,
     currency: value.currency,
-    syncEndpoint: value.syncEndpoint,
-    conflictPolicy: value.conflictPolicy,
     hasSeenPrivacyModal,
     backupRemindersEnabled,
     lastBackupAt,
     changesSinceBackup,
     lastReminderAt,
   }
-}
-
-function parseSyncQueueItem(
-  value: unknown,
-  useLegacyRecurringDefaults: boolean,
-  categories: Category[],
-  categoriesById: Map<string, Category>,
-): SyncQueueItem | null {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  if (
-    !isString(value.id) ||
-    (value.entityType !== 'transaction' &&
-      value.entityType !== 'category' &&
-      value.entityType !== 'budget') ||
-    (value.action !== 'upsert' && value.action !== 'delete') ||
-    !isString(value.entityId) ||
-    !isString(value.queuedAt) ||
-    !isNumber(value.attempts)
-  ) {
-    return null
-  }
-
-  let payload: SyncQueueItem['payload']
-
-  if (value.payload === null) {
-    payload = null
-  } else if (value.entityType === 'category') {
-    const parsedCategory = parseCategory(value.payload)
-
-    if (!parsedCategory) {
-      return null
-    }
-
-    payload = parsedCategory
-  } else if (value.entityType === 'transaction') {
-    const parsedTransaction = parseTransaction(value.payload, useLegacyRecurringDefaults)
-
-    if (!parsedTransaction) {
-      return null
-    }
-
-    payload = normalizeTransactionCategory(parsedTransaction, categoriesById)
-  } else {
-    const parsedBudget = parseBudgetCandidate(value.payload)
-
-    if (!parsedBudget) {
-      return null
-    }
-
-    const normalizedBudget = buildBudgetFromCandidate(
-      parsedBudget,
-      categories,
-      categoriesById,
-    )
-
-    if (!normalizedBudget) {
-      return null
-    }
-
-    payload = normalizedBudget
-  }
-
-  return {
-    id: value.id,
-    entityType: value.entityType,
-    action: value.action,
-    entityId: value.entityId,
-    payload,
-    queuedAt: value.queuedAt,
-    attempts: value.attempts,
-  }
-}
-
-function isSyncQueueItem(value: unknown): value is SyncQueueItem {
-  if (!isRecord(value)) {
-    return false
-  }
-
-  const payloadIsValid =
-    value.payload === null ||
-    isCategory(value.payload) ||
-    isTransaction(value.payload) ||
-    isBudget(value.payload)
-
-  return (
-    isString(value.id) &&
-    (value.entityType === 'transaction' ||
-      value.entityType === 'category' ||
-      value.entityType === 'budget') &&
-    (value.action === 'upsert' || value.action === 'delete') &&
-    isString(value.entityId) &&
-    payloadIsValid &&
-    isString(value.queuedAt) &&
-    isNumber(value.attempts)
-  )
 }
 
 export function isFinanceState(value: unknown): value is FinanceState {
@@ -559,12 +441,7 @@ export function isFinanceState(value: unknown): value is FinanceState {
     value.budgets.every(isBudget) &&
     Array.isArray(value.recurringTemplates) &&
     value.recurringTemplates.every((entry) => parseRecurringTemplate(entry) !== null) &&
-    Array.isArray(value.syncQueue) &&
-    value.syncQueue.every(isSyncQueueItem) &&
-    isAppSettings(value.settings) &&
-    (value.lastSyncedAt === null || isString(value.lastSyncedAt)) &&
-    (value.lastSyncAttemptAt === null || isString(value.lastSyncAttemptAt)) &&
-    (value.lastSyncError === null || isString(value.lastSyncError))
+    isAppSettings(value.settings)
   )
 }
 
@@ -626,30 +503,11 @@ export function parsePersistedFinanceState(value: unknown): FinanceState | null 
     normalizeRecurringTemplateCategory(template, categoriesById),
   )
 
-  const syncQueue = Array.isArray(value.syncQueue)
-    ? value.syncQueue
-        .map((item) => parseSyncQueueItem(item, true, categories, categoriesById))
-        .filter((item): item is SyncQueueItem => item !== null)
-    : null
-
-  if (
-    syncQueue === null ||
-    !(value.lastSyncedAt === null || isString(value.lastSyncedAt)) ||
-    !(value.lastSyncAttemptAt === null || isString(value.lastSyncAttemptAt)) ||
-    !(value.lastSyncError === null || isString(value.lastSyncError))
-  ) {
-    return null
-  }
-
   return {
     categories,
     transactions,
     budgets: [...budgetsById.values()],
     recurringTemplates,
-    syncQueue,
     settings,
-    lastSyncedAt: value.lastSyncedAt,
-    lastSyncAttemptAt: value.lastSyncAttemptAt,
-    lastSyncError: value.lastSyncError,
   }
 }

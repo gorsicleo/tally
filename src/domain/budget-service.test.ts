@@ -75,7 +75,6 @@ describe('budget-service helpers', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-02T08:00:00.000Z',
           updatedAt: '2026-03-02T08:00:00.000Z',
-          syncStatus: 'synced',
         },
         {
           id: 'txn-income',
@@ -88,7 +87,6 @@ describe('budget-service helpers', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-03-02T08:00:00.000Z',
           updatedAt: '2026-03-02T08:00:00.000Z',
-          syncStatus: 'synced',
         },
         {
           id: 'txn-other-month',
@@ -101,7 +99,6 @@ describe('budget-service helpers', () => {
           recurringOccurrenceDate: null,
           createdAt: '2026-04-01T08:00:00.000Z',
           updatedAt: '2026-04-01T08:00:00.000Z',
-          syncStatus: 'synced',
         },
       ],
     )

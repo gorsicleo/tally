@@ -23,15 +23,11 @@ export function exportTransactionsAsCsv(state: FinanceState): string {
       categoryName,
       transaction.note,
       transaction.occurredAt,
-      transaction.syncStatus,
       transaction.updatedAt,
     ]
       .map((cell) => escapeCsvCell(String(cell)))
       .join(',')
   })
 
-  return [
-    'id,type,amount,category,note,occurredAt,syncStatus,updatedAt',
-    ...rows,
-  ].join('\n')
+  return ['id,type,amount,category,note,occurredAt,updatedAt', ...rows].join('\n')
 }

@@ -19,7 +19,6 @@ function createSampleState(): FinanceState {
         system: null,
         createdAt: '2026-03-10T10:00:00.000Z',
         updatedAt: '2026-03-10T10:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     transactions: [
@@ -34,7 +33,6 @@ function createSampleState(): FinanceState {
         recurringOccurrenceDate: null,
         createdAt: '2026-03-11T08:00:00.000Z',
         updatedAt: '2026-03-11T08:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     budgets: [
@@ -46,7 +44,6 @@ function createSampleState(): FinanceState {
         limit: 120,
         createdAt: '2026-03-01T09:00:00.000Z',
         updatedAt: '2026-03-01T09:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     recurringTemplates: [
@@ -63,7 +60,6 @@ function createSampleState(): FinanceState {
         active: true,
         createdAt: '2026-03-01T09:00:00.000Z',
         updatedAt: '2026-03-01T09:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     settings: {

@@ -19,7 +19,6 @@ function createSampleState(): FinanceState {
         recurringOccurrenceDate: null,
         createdAt: '2026-03-18T12:00:00.000Z',
         updatedAt: '2026-03-18T12:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     recurringTemplates: [
@@ -36,7 +35,6 @@ function createSampleState(): FinanceState {
         active: true,
         createdAt: '2026-03-18T12:00:00.000Z',
         updatedAt: '2026-03-18T12:00:00.000Z',
-        syncStatus: 'synced',
       },
     ],
     settings: {
@@ -64,8 +62,6 @@ describe('prepareBackupRestore', () => {
     expect(result.prepared.payload.exportedAt).toBe(exportedAt)
     expect(result.prepared.nextState.transactions).toHaveLength(1)
     expect(result.prepared.nextState.recurringTemplates).toHaveLength(1)
-    expect(result.prepared.nextState.syncQueue).toHaveLength(0)
-    expect(result.prepared.nextState.lastSyncedAt).toBeNull()
     expect(result.prepared.nextState.settings.lastBackupAt).toBe(exportedAt)
     expect(result.prepared.nextState.settings.changesSinceBackup).toBe(0)
     expect(result.prepared.nextState.settings.lastReminderAt).toBeNull()
@@ -128,8 +124,6 @@ describe('prepareBackupRestore', () => {
           preferences: {
             theme: 'dark',
             currency: 'USD',
-            syncEndpoint: 'demo://local',
-            conflictPolicy: 'client-wins',
           },
         },
       }),
@@ -158,7 +152,6 @@ describe('prepareBackupRestore', () => {
               occurredAt: '2026-03-18',
               createdAt: '2026-03-18T08:00:00.000Z',
               updatedAt: '2026-03-18T08:00:00.000Z',
-              syncStatus: 'synced',
             },
           ],
           categories: initialFinanceState.categories,
@@ -166,8 +159,6 @@ describe('prepareBackupRestore', () => {
           preferences: {
             theme: 'dark',
             currency: 'USD',
-            syncEndpoint: 'demo://local',
-            conflictPolicy: 'client-wins',
           },
         },
       }),
