@@ -1,0 +1,75 @@
+name: Feature request
+description: Propose an improvement to the app experience or developer workflow.
+title: "feat: "
+labels:
+  - enhancement
+  - triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement.
+        Please describe the user or maintainer value clearly.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What outcome are we trying to achieve?
+      placeholder: Add month-over-month budget trend indicators in Insights.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this needed now?
+      placeholder: Users can see totals but cannot quickly spot improving or worsening budget patterns.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: In-scope and out-of-scope boundaries.
+      placeholder: |
+        In scope: Insights trend badges and supporting selector updates.
+        Out of scope: New forecasting models or remote sync.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      description: Break the work into practical implementation steps.
+      placeholder: |
+        - Finalize UX copy and placement
+        - Add/extend selectors for trend deltas
+        - Implement UI and tests
+        - Update docs if user-facing behavior changes
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Objective conditions that define done.
+      placeholder: |
+        - Trend indicators appear for supported views
+        - Calculations are correct for edge cases
+        - Tests cover happy path and key edge cases
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes_alternatives
+    attributes:
+      label: Additional notes / alternatives (optional)
+      description: Any alternatives considered or extra context.
+      placeholder: Could also render trend arrows in Home cards, but Insights-first may be cleaner.
+    validations:
+      required: false
