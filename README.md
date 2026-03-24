@@ -5,17 +5,23 @@
 <div align="center">
   <h1><b>Tally</b></h1>
   <p><i>A fast, mobile-first personal finance tracker built for simplicity and control.</i></p>
+  <p>
+    <a href="https://tallyfor.me">
+      <img src="https://img.shields.io/badge/Open%20Live%20App-tallyfor.me-0f766e?style=for-the-badge" alt="Open Live App at tallyfor.me" />
+    </a>
+  </p>
+  <p>
+    <a href="./docs/architecture.md"><strong>Read the docs</strong></a>
+    ·
+    <a href="./docs/contributing.md"><strong>Contribute</strong></a>
+  </p>
 </div>
 
 ## Overview
 
-**Tally** is a modern, mobile-first personal finance tracker designed to be:
+**Tally** is a local-first personal finance tracker for quick daily use.
 
-- Fast and offline-first
-- Simple but powerful
-- Installable as a PWA
-
-It focuses on **clarity, speed, and usability**, without unnecessary complexity.
+Track income and expenses, organize categories, review trends and budgets, and keep control of your data with on-device storage and manual backups. It is built to stay fast, readable, and useful without requiring an account or a backend.
 
 ## Features
 
@@ -28,7 +34,7 @@ It focuses on **clarity, speed, and usability**, without unnecessary complexity.
 - Running totals and monthly summaries
 - Export transactions to CSV
 
-### Dashboard (Home)
+### Home
 
 - Monthly summary
 - Recent activity
@@ -62,18 +68,14 @@ It focuses on **clarity, speed, and usability**, without unnecessary complexity.
 
 ## Offline-First
 
-- IndexedDB-based persistence
-- Works fully offline
-- Offline changes are retained locally on the device
+- Data is stored locally in the browser with IndexedDB and localStorage fallback
+- Core tracking works without a network connection
+- Backup export and restore provide a manual way to keep or move your data
 
 ## Additional Options
 
 - Backup reminders
-- Install as app (mobile and desktop)
 - Privacy-first onboarding modal
-- Export:
-  - CSV
-  - JSON
 
 ## PWA Support
 
@@ -157,11 +159,7 @@ This split keeps business logic testable and the UI focused on interaction.
 
 Contributions are welcome.
 
-If you would like to help:
-
-- Open an issue
-- Submit a PR
-- Suggest features or improvements
+If you want to help, start with [docs/contributing.md](./docs/contributing.md). It covers local setup, common scripts, issue and PR expectations, and when targeted tests or doc updates are expected.
 
 ## License
 
