@@ -34,6 +34,9 @@ interface TransactionEditorSheetProps {
 const SHEET_CLOSE_MS = 280
 const SHEET_DEFAULTS_KEY = 'tally.transaction-sheet.defaults.v1'
 const MAX_QUICK_CATEGORY_CHIPS = 5
+const AMOUNT_INPUT_PATTERN = '(?:\\d+(?:[.,]\\d{1,2})?|[.,]\\d{1,2})'
+const AMOUNT_INPUT_REGEX = /^(?:\d+(?:[.,]\d{1,2})?|[.,]\d{1,2})$/
+const AMOUNT_FORMAT_ERROR = 'Enter a valid amount (for example 12.50 or 12,50).'
 
 interface TransactionSheetDefaults {
   lastType: TransactionType
@@ -125,7 +128,7 @@ function parseAmountInput(value: string): number {
     return Number.NaN
   }
 
-  if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(trimmedValue)) {
+  if (!AMOUNT_INPUT_REGEX.test(trimmedValue)) {
     return Number.NaN
   }
 
@@ -332,7 +335,12 @@ export function TransactionEditorSheet({
       return
     }
 
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    if (!Number.isFinite(numericAmount)) {
+      setError(AMOUNT_FORMAT_ERROR)
+      return
+    }
+
+    if (numericAmount <= 0) {
       setError('Amount must be greater than zero.')
       return
     }
@@ -446,7 +454,7 @@ export function TransactionEditorSheet({
               ref={amountInputRef}
               type="text"
               inputMode="decimal"
-              pattern="[0-9]*[.,]?[0-9]*"
+              pattern={AMOUNT_INPUT_PATTERN}
               value={amount}
               onChange={(event) => {
                 setAmount(event.target.value)

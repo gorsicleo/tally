@@ -188,6 +188,46 @@ describe('TransactionEditorSheet', () => {
     )
   })
 
+  it('rejects invalid amount precision and ambiguous separators', async () => {
+    const { user, onCreate } = renderSheet()
+    const amountInput = screen.getByLabelText('Amount') as HTMLInputElement
+
+    fireEvent.change(amountInput, {
+      target: { value: '0.001' },
+    })
+    expect(amountInput.checkValidity()).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onCreate).not.toHaveBeenCalled()
+
+    fireEvent.change(amountInput, {
+      target: { value: '1,000' },
+    })
+    expect(amountInput.checkValidity()).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it('shows a format-specific error for unparsable amount values', async () => {
+    const { onCreate, container } = renderSheet()
+
+    fireEvent.change(screen.getByLabelText('Amount'), {
+      target: { value: '.' },
+    })
+
+    const form = container.querySelector('form')
+
+    if (!form) {
+      throw new Error('Transaction form is missing')
+    }
+
+    fireEvent.submit(form)
+
+    expect(
+      await screen.findByText('Enter a valid amount (for example 12.50 or 12,50).'),
+    ).toBeInTheDocument()
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
   it('updates an existing transaction in edit mode', async () => {
     const { user, onUpdate } = renderSheet({
       mode: 'edit',
