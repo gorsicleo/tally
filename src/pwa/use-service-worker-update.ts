@@ -150,20 +150,6 @@ export function useServiceWorkerUpdate(): ServiceWorkerUpdateState {
 
   const availableVersion = availableVersionInfo?.version ?? null
 
-  useEffect(() => {
-    if (!availableVersion) {
-      return
-    }
-
-    if (!isDismissedForVersion(dismissedUpdate, availableVersion)) {
-      return
-    }
-
-    if (dismissedUpdate?.version !== availableVersion) {
-      setDismissedUpdate(null)
-    }
-  }, [availableVersion, dismissedUpdate])
-
   const dismiss = useCallback(() => {
     if (!availableVersion) {
       return
