@@ -8,6 +8,7 @@ export interface BackupPreferences {
   hasSeenPrivacyModal: boolean
   backupRemindersEnabled: boolean
   lastBackupAt: string | null
+  backupReminderBaselineAt: string | null
   changesSinceBackup: number
   lastReminderAt: string | null
 }
