@@ -108,8 +108,9 @@ describe('TransactionEditorSheet', () => {
     })
     await user.click(screen.getByRole('button', { name: /Repeat/i }))
     await user.click(screen.getByRole('button', { name: 'Custom' }))
-    await user.clear(screen.getByLabelText('Repeat every how many days?'))
-    await user.type(screen.getByLabelText('Repeat every how many days?'), '10')
+    fireEvent.change(screen.getByLabelText('Repeat every how many days?'), {
+      target: { value: '10' },
+    })
     fireEvent.change(screen.getByLabelText('Start date'), {
       target: { value: '2026-03-25' },
     })
@@ -164,6 +165,67 @@ describe('TransactionEditorSheet', () => {
       },
       null,
     )
+  })
+
+  it('accepts a comma as the decimal separator', async () => {
+    const { user, onCreate } = renderSheet()
+
+    fireEvent.change(screen.getByLabelText('Amount'), {
+      target: { value: '42,5' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Food' }))
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(onCreate).toHaveBeenCalledWith(
+      {
+        type: 'expense',
+        amount: 42.5,
+        categoryId: 'cat-food',
+        note: '',
+        occurredAt: getTodayLocalDate(),
+      },
+      null,
+    )
+  })
+
+  it('rejects invalid amount precision and ambiguous separators', async () => {
+    const { user, onCreate } = renderSheet()
+    const amountInput = screen.getByLabelText('Amount') as HTMLInputElement
+
+    fireEvent.change(amountInput, {
+      target: { value: '0.001' },
+    })
+    expect(amountInput.checkValidity()).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onCreate).not.toHaveBeenCalled()
+
+    fireEvent.change(amountInput, {
+      target: { value: '1,000' },
+    })
+    expect(amountInput.checkValidity()).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onCreate).not.toHaveBeenCalled()
+  })
+
+  it('shows a format-specific error for unparsable amount values', async () => {
+    const { onCreate, container } = renderSheet()
+
+    fireEvent.change(screen.getByLabelText('Amount'), {
+      target: { value: '.' },
+    })
+
+    const form = container.querySelector('form')
+
+    if (!form) {
+      throw new Error('Transaction form is missing')
+    }
+
+    fireEvent.submit(form)
+
+    expect(
+      await screen.findByText('Enter a valid amount (for example 12.50 or 12,50).'),
+    ).toBeInTheDocument()
+    expect(onCreate).not.toHaveBeenCalled()
   })
 
   it('updates an existing transaction in edit mode', async () => {

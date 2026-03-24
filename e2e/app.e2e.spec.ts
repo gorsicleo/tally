@@ -12,7 +12,7 @@ test('adds a transaction from the sheet and shows it in records', async ({ page 
   await page.getByRole('button', { name: 'Add' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Add transaction' })
-  await dialog.getByRole('spinbutton', { name: 'Amount' }).fill('19.99')
+  await dialog.getByLabel('Amount').fill('19.99')
   await dialog.getByRole('button', { name: '+ Add note' }).click()
   await dialog.getByRole('textbox', { name: 'Note (optional)' }).fill('E2E lunch')
   await dialog.getByRole('button', { name: 'Add' }).click()

@@ -34,6 +34,9 @@ interface TransactionEditorSheetProps {
 const SHEET_CLOSE_MS = 280
 const SHEET_DEFAULTS_KEY = 'tally.transaction-sheet.defaults.v1'
 const MAX_QUICK_CATEGORY_CHIPS = 5
+const AMOUNT_INPUT_PATTERN = '(?:\\d+(?:[.,]\\d{1,2})?|[.,]\\d{1,2})'
+const AMOUNT_INPUT_REGEX = /^(?:\d+(?:[.,]\d{1,2})?|[.,]\d{1,2})$/
+const AMOUNT_FORMAT_ERROR = 'Enter a valid amount (for example 12.50 or 12,50).'
 
 interface TransactionSheetDefaults {
   lastType: TransactionType
@@ -116,6 +119,20 @@ function getCompatibleCategories(
   return categories.filter(
     (category) => category.kind === 'both' || category.kind === type,
   )
+}
+
+function parseAmountInput(value: string): number {
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return Number.NaN
+  }
+
+  if (!AMOUNT_INPUT_REGEX.test(trimmedValue)) {
+    return Number.NaN
+  }
+
+  return Number(trimmedValue.replace(',', '.'))
 }
 
 export function TransactionEditorSheet({
@@ -311,14 +328,19 @@ export function TransactionEditorSheet({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    const numericAmount = Number(amount)
+    const numericAmount = parseAmountInput(amount)
 
     if (!selectedCategoryId) {
       setError('Create a matching category first.')
       return
     }
 
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    if (!Number.isFinite(numericAmount)) {
+      setError(AMOUNT_FORMAT_ERROR)
+      return
+    }
+
+    if (numericAmount <= 0) {
       setError('Amount must be greater than zero.')
       return
     }
@@ -430,10 +452,9 @@ export function TransactionEditorSheet({
           <div className="sheet-amount-field">
             <input
               ref={amountInputRef}
-              type="number"
+              type="text"
               inputMode="decimal"
-              min="0"
-              step="0.01"
+              pattern={AMOUNT_INPUT_PATTERN}
               value={amount}
               onChange={(event) => {
                 setAmount(event.target.value)

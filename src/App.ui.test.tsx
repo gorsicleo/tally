@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { initialFinanceState } from './domain/default-data'
 import type { FinanceState, RecurringTemplate, Transaction } from './domain/models'
@@ -119,18 +119,18 @@ describe('App UI behavior', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' })
-    const amountInput = within(dialog).getByRole('spinbutton', { name: 'Amount' })
+    const amountInput = within(dialog).getByLabelText('Amount')
 
-    await user.clear(amountInput)
-    await user.type(amountInput, '0')
+    fireEvent.change(amountInput, { target: { value: '0' } })
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
 
     expect(await within(dialog).findByText('Amount must be greater than zero.')).toBeInTheDocument()
 
-    await user.clear(amountInput)
-    await user.type(amountInput, '12.50')
+    fireEvent.change(amountInput, { target: { value: '12.50' } })
     await user.click(within(dialog).getByRole('button', { name: '+ Add note' }))
-    await user.type(within(dialog).getByRole('textbox', { name: 'Note (optional)' }), 'Coffee beans')
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Note (optional)' }), {
+      target: { value: 'Coffee beans' },
+    })
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
 
     expect(await screen.findByText('Saved')).toBeInTheDocument()
