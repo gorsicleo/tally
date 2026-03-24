@@ -55,17 +55,16 @@ It focuses on **clarity, speed, and usability**, without unnecessary complexity.
 
 ### Settings
 
-- Theme toggle (light and dark)
+- Theme selection (light, dark, or auto)
 - Currency selection
 - Category management
-- Sync status and manual sync trigger
 - Optional install prompt (PWA)
 
 ## Offline-First
 
 - IndexedDB-based persistence
 - Works fully offline
-- Offline changes are retained until synced
+- Offline changes are retained locally on the device
 
 ## Additional Options
 
@@ -114,6 +113,13 @@ npm run build
 npm run preview
 ```
 
+## Documentation
+
+- [Architecture](./docs/architecture.md)
+- [Data model](./docs/data-model.md)
+- [Testing guide](./docs/testing.md)
+- [Contributing guide](./docs/contributing.md)
+
 ## Project Structure
 
 ```text
@@ -124,7 +130,6 @@ src/
   persistence/   IndexedDB and local state persistence
   pwa/           Service worker registration and install prompt handling
   state/         Finance context, reducer, and store interfaces
-  sync/          Queue sync client and related sync flow
   utils/         Shared utilities (date, id, download, etc.)
 ```
 
@@ -136,14 +141,14 @@ Tally follows a React + TypeScript architecture with clear boundaries:
 - State Layer (`src/state/`): central state with context + reducer updates
 - Domain Layer (`src/domain/`): pure, reusable business logic and selectors
 - Persistence Layer (`src/persistence/`): local durable storage for offline-first use
-- Sync Layer (`src/sync/`): optional queue-based synchronization to a configured endpoint
+- Backup Layer (`src/backup/`): backup export, restore validation, and reminders
+- PWA Layer (`src/pwa/`, `src/sw.ts`): install prompt handling and offline shell caching
 
 This split keeps business logic testable and the UI focused on interaction.
 
 ## Limitations
 
 - Single-user local app; no built-in accounts or multi-device identity
-- Sync requires a compatible endpoint implementation; no hosted backend is included
 - Clearing browser/app storage can remove local data
 - Backup files are plain JSON and should be handled securely
 - No built-in advanced accounting or tax/reporting workflows beyond current insights and CSV export
