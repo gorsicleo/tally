@@ -24,6 +24,7 @@ interface BackupReminderStateLike {
     AppSettings,
     | 'backupRemindersEnabled'
     | 'lastBackupAt'
+    | 'backupReminderBaselineAt'
     | 'changesSinceBackup'
     | 'lastReminderAt'
   >
@@ -71,6 +72,15 @@ export function evaluateBackupReminder(
   }
 
   if (!state.settings.lastBackupAt) {
+    const baselineTimestamp = getTimestamp(state.settings.backupReminderBaselineAt)
+
+    if (
+      baselineTimestamp !== null &&
+      nowTimestamp - baselineTimestamp < BACKUP_REMINDER_STALE_DAYS * DAY_IN_MS
+    ) {
+      return { shouldShow: false, reason: null }
+    }
+
     return hasMeaningfulBackupData(state)
       ? { shouldShow: true, reason: 'missing-backup' }
       : { shouldShow: false, reason: null }

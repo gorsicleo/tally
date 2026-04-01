@@ -54,6 +54,21 @@ describe('evaluateBackupReminder', () => {
     expect(result).toEqual({ shouldShow: true, reason: 'missing-backup' })
   })
 
+  it('delays missing-backup reminders during baseline window', () => {
+    const result = evaluateBackupReminder(
+      {
+        ...createReminderState(),
+        settings: {
+          ...createReminderState().settings,
+          backupReminderBaselineAt: '2026-03-18T10:00:00.000Z',
+        },
+      },
+      new Date('2026-03-19T10:00:00.000Z'),
+    )
+
+    expect(result).toEqual({ shouldShow: false, reason: null })
+  })
+
   it('shows a reminder when the last backup is stale', () => {
     const result = evaluateBackupReminder(
       {

@@ -41,6 +41,7 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState?.settings.hasSeenPrivacyModal).toBe(true)
     expect(parsedState?.settings.backupRemindersEnabled).toBe(true)
     expect(parsedState?.settings.lastBackupAt).toBeNull()
+    expect(parsedState?.settings.backupReminderBaselineAt).toBeNull()
     expect(parsedState?.settings.changesSinceBackup).toBe(0)
     expect(parsedState?.settings.lastReminderAt).toBeNull()
     expect(parsedState?.recurringTemplates).toEqual([])
