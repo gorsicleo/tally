@@ -12,7 +12,7 @@ describe('report-bug-info', () => {
     const text = buildBugReportInfoText({
       appName: 'Tally',
       version: '1.2.3',
-      buildIdentifier: 'minor',
+      updateSeverity: 'minor',
       installedPwa: true,
       platform: 'Android',
       browser: 'Chrome 125.0',
@@ -34,7 +34,7 @@ describe('report-bug-info', () => {
     const text = buildBugReportInfoText({
       appName: 'Tally',
       version: null,
-      buildIdentifier: null,
+      updateSeverity: null,
       installedPwa: null,
       platform: null,
       browser: null,
@@ -46,7 +46,7 @@ describe('report-bug-info', () => {
     })
 
     expect(text).toContain('Version: unknown')
-    expect(text).toContain('Build: unknown')
+    expect(text).toContain('Update severity: unknown')
     expect(text).toContain('Installed PWA: unknown')
     expect(text).toContain('Theme: unknown')
   })
@@ -55,7 +55,7 @@ describe('report-bug-info', () => {
     const installedNo = buildBugReportInfoText({
       appName: 'Tally',
       version: '1.0.0',
-      buildIdentifier: 'minor',
+      updateSeverity: 'minor',
       installedPwa: false,
       platform: 'Linux',
       browser: 'Firefox 120',
@@ -74,7 +74,7 @@ describe('report-bug-info', () => {
     const text = buildBugReportInfoText({
       appName: 'Tally',
       version: '1.0.0',
-      buildIdentifier: 'minor',
+      updateSeverity: 'minor',
       installedPwa: false,
       platform: 'Linux',
       browser: 'Chrome 120',
@@ -96,6 +96,11 @@ describe('report-bug-info', () => {
         'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15',
       ),
     ).toBe('iOS')
+    expect(
+      detectPlatformFamily(
+        'Mozilla/5.0 (X11; CrOS x86_64 15964.70.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.114 Safari/537.36 Linux',
+      ),
+    ).toBe('ChromeOS')
     expect(summarizeBrowser('Mozilla/5.0 Chrome/125.0.0.0 Safari/537.36')).toBe(
       'Chrome 125.0.0.0',
     )
@@ -123,9 +128,14 @@ describe('report-bug-info', () => {
       matchMedia: () => ({ matches: false } as MediaQueryList),
     })
 
+    const unknownInstallation = detectPwaInstalled({
+      navigatorObject: { userAgent: 'Mozilla/5.0' },
+    })
+
     expect(displayModeInstalled).toBe(true)
     expect(iosInstalled).toBe(true)
     expect(notInstalled).toBe(false)
+    expect(unknownInstallation).toBeNull()
   })
 
   it('collects diagnostics even when optional browser APIs are missing', () => {
@@ -153,5 +163,26 @@ describe('report-bug-info', () => {
     expect(info.locale).toBe('en-US')
     expect(info.viewport).toBe('390x844 (mobile)')
     expect(info.online).toBe(true)
+    expect(info.installedPwa).toBe(false)
+  })
+
+  it('marks installed PWA as unknown when detection inputs are unavailable', () => {
+    const info = collectBugReportInfo({
+      timestamp: new Date('2026-03-24T10:20:30.000Z'),
+      navigatorObject: {
+        userAgent: 'Mozilla/5.0 (Linux) Chrome/126.0.0.0 Safari/537.36',
+      },
+      windowObject: {
+        innerWidth: 1280,
+        innerHeight: 900,
+      },
+      documentObject: {
+        documentElement: {
+          getAttribute: () => null,
+        },
+      },
+    })
+
+    expect(info.installedPwa).toBeNull()
   })
 })

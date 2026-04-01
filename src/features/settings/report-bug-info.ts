@@ -13,7 +13,7 @@ export interface BugReportInfo {
   locale: string | null
   online: boolean | null
   viewport: string | null
-  buildIdentifier: string | null
+  updateSeverity: string | null
   timestamp: string
 }
 
@@ -67,9 +67,13 @@ function getBrowserVersion(userAgent: string, token: RegExp): string | null {
   return match?.[1] ?? null
 }
 
-export function detectPwaInstalled(input: PwaInstallDetectionInput = {}): boolean {
+export function detectPwaInstalled(input: PwaInstallDetectionInput = {}): boolean | null {
   const navigatorObject = input.navigatorObject
   const matchMedia = input.matchMedia
+
+  if (typeof matchMedia !== 'function' && typeof navigatorObject?.standalone !== 'boolean') {
+    return null
+  }
 
   const standaloneMode =
     typeof matchMedia === 'function' &&
@@ -103,12 +107,12 @@ export function detectPlatformFamily(
     return 'macOS'
   }
 
-  if (/linux/.test(ua)) {
-    return 'Linux'
-  }
-
   if (/cros/.test(ua)) {
     return 'ChromeOS'
+  }
+
+  if (/linux/.test(ua)) {
+    return 'Linux'
   }
 
   return 'Unknown'
@@ -224,21 +228,22 @@ export function collectBugReportInfo(options: BugReportInfoOptions = {}): BugRep
   const documentObject = options.documentObject ?? defaultDocument
 
   const userAgent = navigatorObject?.userAgent ?? ''
+  const installedPwa = detectPwaInstalled({
+    navigatorObject,
+    matchMedia: windowObject?.matchMedia,
+  })
 
   return {
     appName: 'Tally',
     version: getVersionOrNull(),
-    installedPwa: detectPwaInstalled({
-      navigatorObject,
-      matchMedia: windowObject?.matchMedia,
-    }),
+    installedPwa,
     platform: userAgent ? detectPlatformFamily(userAgent) : null,
     browser: userAgent ? summarizeBrowser(userAgent) : null,
     theme: getTheme(documentObject),
     locale: navigatorObject?.language ?? null,
     online: typeof navigatorObject?.onLine === 'boolean' ? navigatorObject.onLine : null,
     viewport: getViewportSummary(windowObject),
-    buildIdentifier: typeof __APP_UPDATE_SEVERITY__ === 'string' ? __APP_UPDATE_SEVERITY__ : null,
+    updateSeverity: typeof __APP_UPDATE_SEVERITY__ === 'string' ? __APP_UPDATE_SEVERITY__ : null,
     timestamp: (options.timestamp ?? new Date()).toISOString(),
   }
 }
@@ -247,7 +252,7 @@ export function buildBugReportInfoText(info: BugReportInfo): string {
   return [
     `App: ${normalizeValue(info.appName)}`,
     `Version: ${normalizeValue(info.version)}`,
-    `Build: ${normalizeValue(info.buildIdentifier)}`,
+    `Update severity: ${normalizeValue(info.updateSeverity)}`,
     `Installed PWA: ${toYesNoUnknown(info.installedPwa)}`,
     `Platform: ${normalizeValue(info.platform)}`,
     `Browser: ${normalizeValue(info.browser)}`,

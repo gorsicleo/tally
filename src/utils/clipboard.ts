@@ -71,14 +71,18 @@ export async function copyTextToClipboard(
     textarea.style.left = '-9999px'
 
     documentObject.body.appendChild(textarea)
-    textarea.focus()
-    textarea.select()
+    let didCopy = false
 
-    const didCopy = typeof documentObject.execCommand === 'function'
-      ? documentObject.execCommand('copy')
-      : false
+    try {
+      textarea.focus()
+      textarea.select()
+      didCopy = typeof documentObject.execCommand === 'function'
+        ? documentObject.execCommand('copy')
+        : false
+    } finally {
+      documentObject.body.removeChild(textarea)
+    }
 
-    documentObject.body.removeChild(textarea)
     return didCopy
   } catch {
     return false

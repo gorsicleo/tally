@@ -16,6 +16,8 @@ export function ReportBugDialog({
   const [isCopying, setIsCopying] = useState(false)
   const [isOpening, setIsOpening] = useState(false)
   const openingLockRef = useRef(false)
+  const resetTimeoutRef = useRef<number | null>(null)
+  const isMountedRef = useRef(true)
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -26,6 +28,12 @@ export function ReportBugDialog({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => {
+      isMountedRef.current = false
+
+      if (resetTimeoutRef.current !== null) {
+        window.clearTimeout(resetTimeoutRef.current)
+      }
+
       window.removeEventListener('keydown', handleKeyDown)
     }
   }, [onCancel])
@@ -55,9 +63,14 @@ export function ReportBugDialog({
     try {
       await onOpenGithubIssue()
     } finally {
-      window.setTimeout(() => {
+      resetTimeoutRef.current = window.setTimeout(() => {
         openingLockRef.current = false
-        setIsOpening(false)
+
+        if (isMountedRef.current) {
+          setIsOpening(false)
+        }
+
+        resetTimeoutRef.current = null
       }, 250)
     }
   }
