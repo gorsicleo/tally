@@ -80,18 +80,17 @@ export function ReportBugDialog({
     } finally {
       if (!isMountedRef.current) {
         openingLockRef.current = false
-        return
+      } else {
+        resetTimeoutRef.current = window.setTimeout(() => {
+          openingLockRef.current = false
+
+          if (isMountedRef.current) {
+            setIsOpening(false)
+          }
+
+          resetTimeoutRef.current = null
+        }, 250)
       }
-
-      resetTimeoutRef.current = window.setTimeout(() => {
-        openingLockRef.current = false
-
-        if (isMountedRef.current) {
-          setIsOpening(false)
-        }
-
-        resetTimeoutRef.current = null
-      }, 250)
     }
   }
 
