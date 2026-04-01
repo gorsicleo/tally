@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 
 const baseRef = process.env.BASE_REF
 
@@ -8,7 +8,7 @@ if (!baseRef) {
 }
 
 function getChangedFiles() {
-  const raw = execSync(`git diff --name-only origin/${baseRef}...HEAD`, {
+  const raw = execFileSync('git', ['diff', '--name-only', `origin/${baseRef}...HEAD`], {
     encoding: 'utf8',
   })
 
@@ -29,6 +29,8 @@ const ignoredPathPrefixes = [
 ]
 const ignoredFiles = new Set(['README.md'])
 const nonFragmentChangesetFiles = new Set(['.changeset/README.md'])
+const relevantRootFiles = new Set(['index.html'])
+const relevantPathPrefixes = ['src/', 'public/']
 
 const hasChangeset = changedFiles.some(
   (filePath) =>
@@ -42,7 +44,15 @@ const hasRelevantChanges = changedFiles.some((filePath) => {
     return false
   }
 
-  return !ignoredPathPrefixes.some((prefix) => filePath.startsWith(prefix))
+  if (ignoredPathPrefixes.some((prefix) => filePath.startsWith(prefix))) {
+    return false
+  }
+
+  if (relevantRootFiles.has(filePath)) {
+    return true
+  }
+
+  return relevantPathPrefixes.some((prefix) => filePath.startsWith(prefix))
 })
 
 if (hasRelevantChanges && !hasChangeset) {

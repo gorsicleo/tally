@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { initialFinanceState } from '../../domain/default-data'
 import type { RecurringTemplate, Transaction } from '../../domain/models'
-import { getTodayLocalDate } from '../../utils/date'
+import { getTodayLocalDate, shiftLocalDateKey } from '../../utils/date'
 import { TransactionEditorSheet } from './transaction-editor-sheet'
 
 const SHEET_DEFAULTS_KEY = 'tally.transaction-sheet.defaults.v1'
@@ -42,13 +42,6 @@ function createRecurringTemplate(
     updatedAt: '2026-03-01T08:00:00.000Z',
     ...overrides,
   }
-}
-
-function addDaysToLocalDate(dateString: string, days: number): string {
-  const nextDate = new Date(`${dateString}T12:00:00`)
-  nextDate.setDate(nextDate.getDate() + days)
-
-  return nextDate.toISOString().slice(0, 10)
 }
 
 function renderSheet(
@@ -98,7 +91,7 @@ describe('TransactionEditorSheet', () => {
   })
 
   it('creates a recurring transaction using stored defaults', async () => {
-    const startDate = addDaysToLocalDate(getTodayLocalDate(), 5)
+    const startDate = shiftLocalDateKey(getTodayLocalDate(), 5)
 
     window.localStorage.setItem(
       SHEET_DEFAULTS_KEY,
