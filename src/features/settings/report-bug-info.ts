@@ -204,7 +204,10 @@ export function collectBugReportInfo(options: BugReportInfoOptions = {}): BugRep
     ? {
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
-        matchMedia: window.matchMedia.bind(window),
+        matchMedia:
+          typeof window.matchMedia === 'function'
+            ? window.matchMedia.bind(window)
+            : undefined,
       }
     : undefined
   const defaultNavigator = typeof navigator !== 'undefined'

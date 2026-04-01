@@ -25,7 +25,7 @@ export function ReportBugDialog({
   }, [isCopying, isOpening])
 
   const handleCancel = () => {
-    if (busyRef.current) {
+    if (isCopying || isOpening) {
       return
     }
 
@@ -56,6 +56,7 @@ export function ReportBugDialog({
       return
     }
 
+    busyRef.current = true
     setIsCopying(true)
 
     try {
@@ -64,6 +65,7 @@ export function ReportBugDialog({
       if (isMountedRef.current) {
         setIsCopying(false)
       }
+      busyRef.current = false
     }
   }
 
@@ -72,6 +74,7 @@ export function ReportBugDialog({
       return
     }
 
+    busyRef.current = true
     openingLockRef.current = true
     setIsOpening(true)
 
@@ -80,9 +83,11 @@ export function ReportBugDialog({
     } finally {
       if (!isMountedRef.current) {
         openingLockRef.current = false
+        busyRef.current = false
       } else {
         resetTimeoutRef.current = window.setTimeout(() => {
           openingLockRef.current = false
+          busyRef.current = false
 
           if (isMountedRef.current) {
             setIsOpening(false)
