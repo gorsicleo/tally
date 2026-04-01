@@ -18,10 +18,23 @@ export function ReportBugDialog({
   const openingLockRef = useRef(false)
   const resetTimeoutRef = useRef<number | null>(null)
   const isMountedRef = useRef(true)
+  const busyRef = useRef(false)
+
+  useEffect(() => {
+    busyRef.current = isCopying || isOpening
+  }, [isCopying, isOpening])
+
+  const handleCancel = () => {
+    if (busyRef.current) {
+      return
+    }
+
+    onCancel()
+  }
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !busyRef.current) {
         onCancel()
       }
     }
@@ -48,7 +61,9 @@ export function ReportBugDialog({
     try {
       await onCopyAppInfo()
     } finally {
-      setIsCopying(false)
+      if (isMountedRef.current) {
+        setIsCopying(false)
+      }
     }
   }
 
@@ -63,6 +78,11 @@ export function ReportBugDialog({
     try {
       await onOpenGithubIssue()
     } finally {
+      if (!isMountedRef.current) {
+        openingLockRef.current = false
+        return
+      }
+
       resetTimeoutRef.current = window.setTimeout(() => {
         openingLockRef.current = false
 
@@ -76,7 +96,7 @@ export function ReportBugDialog({
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onCancel}>
+    <div className="modal-backdrop" role="presentation" onClick={handleCancel}>
       <section
         className="panel modal-panel report-bug-modal-panel"
         role="dialog"
@@ -123,7 +143,7 @@ export function ReportBugDialog({
           <button
             type="button"
             className="ghost-button"
-            onClick={onCancel}
+            onClick={handleCancel}
             disabled={isCopying || isOpening}
           >
             Cancel

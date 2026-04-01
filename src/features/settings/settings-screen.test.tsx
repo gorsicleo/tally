@@ -167,6 +167,35 @@ describe('SettingsScreen direct flows', () => {
     })
   })
 
+  it('ignores escape and backdrop dismissal while app info is copying', async () => {
+    let resolveCopy: ((value: boolean) => void) | null = null
+    clipboardState.copySpy.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveCopy = resolve
+        }),
+    )
+
+    const { user, onShowToast, container } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Copy app info' }))
+
+    expect(await within(dialog).findByRole('button', { name: 'Copying...' })).toBeDisabled()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(container.querySelector('.modal-backdrop') as Element)
+
+    expect(screen.getByRole('dialog', { name: 'Report a bug' })).toBeInTheDocument()
+
+    resolveCopy?.(true)
+
+    await waitFor(() => {
+      expect(onShowToast).toHaveBeenCalledWith('App info copied.')
+    })
+  })
+
   it('opens github issue chooser from report bug dialog', async () => {
     externalLinkState.openSpy.mockReturnValueOnce(true)
 
