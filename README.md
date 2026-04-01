@@ -64,6 +64,7 @@ Track income and expenses, organize categories, review trends and budgets, and k
 - Theme selection (light, dark, or auto)
 - Currency selection
 - Category management
+- Help and feedback links, including GitHub bug reporting
 - Optional install prompt (PWA)
 
 ## Offline-First

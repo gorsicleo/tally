@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { computeCategoryDeletionPlan } from '../../domain/category-service'
 import { SettingsScreen } from './settings-screen'
@@ -7,6 +7,10 @@ import { initialFinanceState } from '../../domain/default-data'
 import type { FinanceState } from '../../domain/models'
 import type { PreparedBackupRestoreResult } from '../../backup/backup-models'
 import type { FinanceContextValue } from '../../state/finance-store'
+import {
+  GITHUB_ISSUE_CHOOSER_URL,
+  GITHUB_PROJECT_URL,
+} from './report-bug-info'
 
 const restoreState = vi.hoisted(() => ({
   result: {
@@ -15,12 +19,36 @@ const restoreState = vi.hoisted(() => ({
   } as PreparedBackupRestoreResult,
 }))
 
+const clipboardState = vi.hoisted(() => ({
+  copySpy: vi.fn<(value: string) => Promise<boolean>>(async () => true),
+}))
+
+const externalLinkState = vi.hoisted(() => ({
+  openSpy: vi.fn<(url: string) => boolean>(() => true),
+}))
+
+const appVersionState = vi.hoisted(() => ({
+  value: { version: '0.0.0-test', changelog: [], severity: 'minor' as const },
+}))
+
 vi.mock('../../backup/restore-service', () => ({
   prepareBackupRestoreFile: vi.fn(async () => restoreState.result),
 }))
 
 vi.mock('../../utils/download', () => ({
   downloadTextFile: vi.fn(),
+}))
+
+vi.mock('../../utils/clipboard', () => ({
+  copyTextToClipboard: clipboardState.copySpy,
+}))
+
+vi.mock('../../utils/external-link', () => ({
+  openExternalUrl: externalLinkState.openSpy,
+}))
+
+vi.mock('../../pwa/app-version', () => ({
+  getCurrentAppVersionInfo: () => appVersionState.value,
 }))
 
 function createState(overrides: Partial<FinanceState> = {}): FinanceState {
@@ -70,6 +98,165 @@ function renderScreen(
 }
 
 describe('SettingsScreen direct flows', () => {
+  beforeEach(() => {
+    clipboardState.copySpy.mockReset()
+    clipboardState.copySpy.mockResolvedValue(true)
+    externalLinkState.openSpy.mockReset()
+    externalLinkState.openSpy.mockReturnValue(true)
+    appVersionState.value = {
+      version: '0.0.0-test',
+      changelog: [],
+      severity: 'minor',
+    }
+  })
+
+  it('renders report a bug in help and feedback', () => {
+    renderScreen(createState())
+
+    expect(screen.getByRole('button', { name: /Report a bug/i })).toBeInTheDocument()
+    expect(screen.getByText('Help & Feedback')).toBeInTheDocument()
+  })
+
+  it('opens and closes report bug dialog from settings', async () => {
+    const { user } = renderScreen(createState())
+
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    expect(within(dialog).getByText(/Bug reports are filed on GitHub/i)).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Copy app info' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Open GitHub issue' })).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Report a bug' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('copies app info and shows success feedback', async () => {
+    clipboardState.copySpy.mockResolvedValueOnce(true)
+
+    const { user, onShowToast } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Copy app info' }))
+
+    await waitFor(() => {
+      expect(clipboardState.copySpy).toHaveBeenCalledTimes(1)
+      expect(onShowToast).toHaveBeenCalledWith('App info copied.')
+    })
+
+    const copiedText = clipboardState.copySpy.mock.calls.at(0)?.at(0)
+    expect(copiedText).toBeTypeOf('string')
+    expect(copiedText).toContain('App: Tally')
+    expect(copiedText).toContain('Version:')
+  })
+
+  it('shows graceful feedback when copy fails', async () => {
+    clipboardState.copySpy.mockResolvedValueOnce(false)
+
+    const { user, onShowToast } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Copy app info' }))
+
+    await waitFor(() => {
+      expect(onShowToast).toHaveBeenCalledWith('Could not copy app info.')
+    })
+  })
+
+  it('ignores escape and backdrop dismissal while app info is copying', async () => {
+    let resolveCopy: ((value: boolean) => void) | null = null
+    clipboardState.copySpy.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveCopy = resolve
+        }),
+    )
+
+    const { user, onShowToast, container } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Copy app info' }))
+
+    expect(await within(dialog).findByRole('button', { name: 'Copying...' })).toBeDisabled()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.click(container.querySelector('.modal-backdrop') as Element)
+
+    expect(screen.getByRole('dialog', { name: 'Report a bug' })).toBeInTheDocument()
+
+    resolveCopy?.(true)
+
+    await waitFor(() => {
+      expect(onShowToast).toHaveBeenCalledWith('App info copied.')
+    })
+  })
+
+  it('opens github issue chooser from report bug dialog', async () => {
+    externalLinkState.openSpy.mockReturnValueOnce(true)
+
+    const { user } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Open GitHub issue' }))
+
+    await waitFor(() => {
+      expect(externalLinkState.openSpy).toHaveBeenCalledWith(GITHUB_ISSUE_CHOOSER_URL)
+      expect(screen.queryByRole('dialog', { name: 'Report a bug' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('prevents duplicate github issue opens on rapid clicks', async () => {
+    externalLinkState.openSpy.mockReturnValue(true)
+
+    const { user } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    const openButton = within(dialog).getByRole('button', { name: 'Open GitHub issue' })
+
+    await user.dblClick(openButton)
+
+    expect(externalLinkState.openSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps dialog usable when app version is missing', async () => {
+    appVersionState.value = {
+      version: '',
+      changelog: [],
+      severity: 'minor',
+    }
+
+    const { user } = renderScreen(createState())
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    expect(within(dialog).queryByText(/App version:/i)).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Copy app info' })).toBeEnabled()
+    expect(within(dialog).getByRole('button', { name: 'Open GitHub issue' })).toBeEnabled()
+
+    appVersionState.value = {
+      version: '0.0.0-test',
+      changelog: [],
+      severity: 'minor',
+    }
+  })
+
+  it('opens project and feature request github links from help section', async () => {
+    const { user } = renderScreen(createState())
+
+    await user.click(screen.getByRole('button', { name: /Request a feature/i }))
+    await user.click(screen.getByRole('button', { name: /View GitHub project/i }))
+
+    expect(externalLinkState.openSpy).toHaveBeenNthCalledWith(1, GITHUB_ISSUE_CHOOSER_URL)
+    expect(externalLinkState.openSpy).toHaveBeenNthCalledWith(2, GITHUB_PROJECT_URL)
+  })
+
   it('shows recurring settings view and opens recurring editor callback', async () => {
     const { user, onOpenRecurringEditor } = renderScreen(
       createState({

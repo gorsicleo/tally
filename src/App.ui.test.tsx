@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { initialFinanceState } from './domain/default-data'
 import type { FinanceState, RecurringTemplate, Transaction } from './domain/models'
+import { GITHUB_ISSUE_CHOOSER_URL } from './features/settings/report-bug-info'
 import { toLocalDateKey } from './utils/date'
 import { renderWithUser } from './test/render-utils'
 
@@ -18,6 +19,11 @@ const storageState = vi.hoisted(() => ({
   },
 }))
 
+const reportBugState = vi.hoisted(() => ({
+  copySpy: vi.fn<(value: string) => Promise<boolean>>(async () => true),
+  openSpy: vi.fn<(url: string) => boolean>(() => true),
+}))
+
 vi.mock('./persistence/finance-storage', () => ({
   loadFinanceState: vi.fn(async () => storageState.loadedState),
   saveFinanceState: storageState.saveSpy,
@@ -25,6 +31,14 @@ vi.mock('./persistence/finance-storage', () => ({
 
 vi.mock('./utils/download', () => ({
   downloadTextFile: storageState.downloadSpy,
+}))
+
+vi.mock('./utils/clipboard', () => ({
+  copyTextToClipboard: reportBugState.copySpy,
+}))
+
+vi.mock('./utils/external-link', () => ({
+  openExternalUrl: reportBugState.openSpy,
 }))
 
 vi.mock('./backup/restore-service', () => ({
@@ -115,7 +129,72 @@ describe('App UI behavior', () => {
       ok: false,
       message: 'This backup file is not valid.',
     }
+    reportBugState.copySpy.mockReset()
+    reportBugState.copySpy.mockResolvedValue(true)
+    reportBugState.openSpy.mockReset()
+    reportBugState.openSpy.mockReturnValue(true)
     window.localStorage.clear()
+  })
+
+  it('opens report bug dialog from settings and copies app info', async () => {
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Copy app info' }))
+
+    await waitFor(() => {
+      expect(reportBugState.copySpy).toHaveBeenCalledTimes(1)
+    })
+    expect(await screen.findByText('App info copied.')).toBeInTheDocument()
+
+    const copiedText = reportBugState.copySpy.mock.calls.at(0)?.at(0)
+    expect(copiedText).toBeTypeOf('string')
+    expect(copiedText).toContain('App: Tally')
+  })
+
+  it('opens github issue URL from report bug dialog', async () => {
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Open GitHub issue' }))
+
+    expect(reportBugState.openSpy).toHaveBeenCalledWith(GITHUB_ISSUE_CHOOSER_URL)
+  })
+
+  it('shows graceful feedback when clipboard is unavailable', async () => {
+    reportBugState.copySpy.mockResolvedValueOnce(false)
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Copy app info' }))
+
+    expect(await screen.findByText('Could not copy app info.')).toBeInTheDocument()
+  })
+
+  it('shows graceful feedback when external navigation fails', async () => {
+    reportBugState.openSpy.mockReturnValueOnce(false)
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    await user.click(screen.getByRole('button', { name: /Report a bug/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Report a bug' })
+    await user.click(within(dialog).getByRole('button', { name: 'Open GitHub issue' }))
+
+    expect(await screen.findByText('Could not open GitHub. Please try again.')).toBeInTheDocument()
   })
 
   it('validates amount and then saves a new transaction from the modal', async () => {

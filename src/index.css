@@ -472,11 +472,21 @@ textarea:focus-visible {
   gap: 16px;
 }
 
+.report-bug-modal-panel {
+  max-width: 520px;
+  gap: 16px;
+}
+
 .backup-modal-copy,
 .backup-reminder-copy,
 .settings-row-copy {
   display: grid;
   gap: 6px;
+}
+
+.report-bug-copy {
+  display: grid;
+  gap: 8px;
 }
 
 .backup-modal-copy {

@@ -57,6 +57,16 @@ test('settings main desktop @visual', async ({ page }) => {
   })
 })
 
+test('report bug dialog desktop @visual', async ({ page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Report a bug' }).click()
+
+  await expect(page).toHaveScreenshot('report-bug-dialog-desktop.png', {
+    fullPage: true,
+    animations: 'disabled',
+  })
+})
+
 test('add transaction modal desktop @visual', async ({ page }) => {
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page).toHaveScreenshot('transaction-modal-desktop.png', {
