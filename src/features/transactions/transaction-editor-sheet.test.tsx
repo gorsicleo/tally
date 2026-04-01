@@ -44,6 +44,13 @@ function createRecurringTemplate(
   }
 }
 
+function addDaysToLocalDate(dateString: string, days: number): string {
+  const nextDate = new Date(`${dateString}T12:00:00`)
+  nextDate.setDate(nextDate.getDate() + days)
+
+  return nextDate.toISOString().slice(0, 10)
+}
+
 function renderSheet(
   overrides: Partial<React.ComponentProps<typeof TransactionEditorSheet>> = {},
 ) {
@@ -91,6 +98,8 @@ describe('TransactionEditorSheet', () => {
   })
 
   it('creates a recurring transaction using stored defaults', async () => {
+    const startDate = addDaysToLocalDate(getTodayLocalDate(), 5)
+
     window.localStorage.setItem(
       SHEET_DEFAULTS_KEY,
       JSON.stringify({
@@ -112,7 +121,7 @@ describe('TransactionEditorSheet', () => {
       target: { value: '10' },
     })
     fireEvent.change(screen.getByLabelText('Start date'), {
-      target: { value: '2026-03-25' },
+      target: { value: startDate },
     })
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
@@ -127,7 +136,7 @@ describe('TransactionEditorSheet', () => {
       {
         frequency: 'custom',
         intervalDays: 10,
-        startDate: '2026-03-25',
+        startDate,
       },
     )
 
