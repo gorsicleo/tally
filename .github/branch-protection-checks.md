@@ -3,6 +3,7 @@
 Configure branch protection for `main` in GitHub repository settings and mark these checks as required:
 
 - `CI / Lint`
+- `CI / Changeset Required`
 - `CI / Unit and Component Tests`
 - `CI / E2E Tests (Playwright)`
 - `CI / Visual Regression (Playwright)`
