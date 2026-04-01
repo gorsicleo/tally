@@ -91,6 +91,7 @@ export const initialFinanceState: FinanceState = {
     hasSeenPrivacyModal: false,
     backupRemindersEnabled: true,
     lastBackupAt: null,
+    backupReminderBaselineAt: null,
     changesSinceBackup: 0,
     lastReminderAt: null,
   },

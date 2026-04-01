@@ -24,6 +24,7 @@ const legacyBackupPreferenceDefaults = {
   hasSeenPrivacyModal: true,
   backupRemindersEnabled: true,
   lastBackupAt: null,
+  backupReminderBaselineAt: null,
   changesSinceBackup: 0,
   lastReminderAt: null,
 } as const
@@ -357,6 +358,7 @@ function isAppSettings(value: unknown): value is AppSettings {
     typeof value.hasSeenPrivacyModal === 'boolean' &&
     typeof value.backupRemindersEnabled === 'boolean' &&
     (value.lastBackupAt === null || isString(value.lastBackupAt)) &&
+    (value.backupReminderBaselineAt === null || isString(value.backupReminderBaselineAt)) &&
     isNonNegativeNumber(value.changesSinceBackup) &&
     (value.lastReminderAt === null || isString(value.lastReminderAt))
   )
@@ -396,6 +398,12 @@ function parseAppSettings(
       : useLegacyBackupDefaults
         ? legacyBackupPreferenceDefaults.lastBackupAt
         : null
+  const backupReminderBaselineAt =
+    value.backupReminderBaselineAt === null || isString(value.backupReminderBaselineAt)
+      ? value.backupReminderBaselineAt
+      : useLegacyBackupDefaults
+        ? legacyBackupPreferenceDefaults.backupReminderBaselineAt
+        : null
   const changesSinceBackup = isNonNegativeNumber(value.changesSinceBackup)
     ? value.changesSinceBackup
     : useLegacyBackupDefaults
@@ -422,6 +430,7 @@ function parseAppSettings(
     hasSeenPrivacyModal,
     backupRemindersEnabled,
     lastBackupAt,
+    backupReminderBaselineAt,
     changesSinceBackup,
     lastReminderAt,
   }

@@ -8,7 +8,9 @@ import { renderWithUser } from './test/render-utils'
 
 const storageState = vi.hoisted(() => ({
   loadedState: null as FinanceState | null,
-  saveSpy: vi.fn(async () => undefined),
+  saveSpy: vi.fn(async (state: FinanceState) => {
+    void state
+  }),
   downloadSpy: vi.fn(),
   restoreResult: {
     ok: false as const,
@@ -226,6 +228,98 @@ describe('App UI behavior', () => {
     expect(screen.getByText('$2,000.00')).toBeInTheDocument()
     expect(screen.getByText('$125.00')).toBeInTheDocument()
   })
+
+  it('does not show backup reminder immediately after first-run privacy confirmation', async () => {
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...initialFinanceState.settings,
+        hasSeenPrivacyModal: false,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+      },
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+    })
+
+    renderWithUser(<App />)
+
+    const privacyDialog = await screen.findByRole('dialog', {
+      name: 'Private by default',
+    })
+
+    fireEvent.click(within(privacyDialog).getByRole('button', { name: 'I understand' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Private by default' }),
+      ).not.toBeInTheDocument()
+    })
+
+    expect(screen.queryByLabelText('Backup reminder')).not.toBeInTheDocument()
+
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 900)
+    })
+
+    expect(screen.queryByLabelText('Backup reminder')).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as
+      | FinanceState
+      | undefined
+
+    expect(latestSavedState?.settings.hasSeenPrivacyModal).toBe(true)
+    expect(latestSavedState?.settings.lastBackupAt).toBeNull()
+    expect(latestSavedState?.settings.backupReminderBaselineAt).not.toBeNull()
+    expect(latestSavedState?.settings.changesSinceBackup).toBe(0)
+  }, 15000)
+
+  it('preserves existing reminder metadata during first-run privacy confirmation', async () => {
+    const existingReminderAt = '2026-03-19T10:00:00.000Z'
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...initialFinanceState.settings,
+        hasSeenPrivacyModal: false,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: existingReminderAt,
+      },
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+    })
+
+    renderWithUser(<App />)
+
+    const privacyDialog = await screen.findByRole('dialog', {
+      name: 'Private by default',
+    })
+
+    fireEvent.click(within(privacyDialog).getByRole('button', { name: 'I understand' }))
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as
+      | FinanceState
+      | undefined
+
+    expect(latestSavedState?.settings.hasSeenPrivacyModal).toBe(true)
+    expect(latestSavedState?.settings.lastBackupAt).toBeNull()
+    expect(latestSavedState?.settings.backupReminderBaselineAt).toBeNull()
+    expect(latestSavedState?.settings.lastReminderAt).toBe(existingReminderAt)
+  }, 15000)
 
   it('supports category deletion flow from settings with confirmation', async () => {
     storageState.loadedState = createLoadedState({
