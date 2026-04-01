@@ -28,9 +28,13 @@ const ignoredPathPrefixes = [
   'test-results/',
 ]
 const ignoredFiles = new Set(['README.md'])
+const nonFragmentChangesetFiles = new Set(['.changeset/README.md'])
 
 const hasChangeset = changedFiles.some(
-  (filePath) => filePath.startsWith('.changeset/') && filePath.endsWith('.md'),
+  (filePath) =>
+    filePath.startsWith('.changeset/') &&
+    filePath.endsWith('.md') &&
+    !nonFragmentChangesetFiles.has(filePath),
 )
 
 const hasRelevantChanges = changedFiles.some((filePath) => {
