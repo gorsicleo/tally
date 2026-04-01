@@ -121,6 +121,7 @@ npm run preview
 - [Architecture](./docs/architecture.md)
 - [Data model](./docs/data-model.md)
 - [Testing guide](./docs/testing.md)
+- [Versioning and releases](./docs/versioning.md)
 - [Contributing guide](./docs/contributing.md)
 
 ## Project Structure

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { initialFinanceState } from '../../domain/default-data'
 import type { RecurringTemplate, Transaction } from '../../domain/models'
-import { getTodayLocalDate } from '../../utils/date'
+import { getTodayLocalDate, shiftLocalDateKey } from '../../utils/date'
 import { TransactionEditorSheet } from './transaction-editor-sheet'
 
 const SHEET_DEFAULTS_KEY = 'tally.transaction-sheet.defaults.v1'
@@ -91,6 +91,8 @@ describe('TransactionEditorSheet', () => {
   })
 
   it('creates a recurring transaction using stored defaults', async () => {
+    const startDate = shiftLocalDateKey(getTodayLocalDate(), 5)
+
     window.localStorage.setItem(
       SHEET_DEFAULTS_KEY,
       JSON.stringify({
@@ -112,7 +114,7 @@ describe('TransactionEditorSheet', () => {
       target: { value: '10' },
     })
     fireEvent.change(screen.getByLabelText('Start date'), {
-      target: { value: '2026-03-25' },
+      target: { value: startDate },
     })
     await user.click(screen.getByRole('button', { name: 'Add' }))
 
@@ -127,7 +129,7 @@ describe('TransactionEditorSheet', () => {
       {
         frequency: 'custom',
         intervalDays: 10,
-        startDate: '2026-03-25',
+        startDate,
       },
     )
 
