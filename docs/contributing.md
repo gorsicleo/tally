@@ -30,6 +30,9 @@ Defined in [package.json](../package.json):
 - npm run dev: Start local development server.
 - npm run build: Type-check and build production assets.
 - npm run lint: Run ESLint.
+- npm run changeset: Create a release note + semver change entry.
+- npm run changeset:status: Inspect release status from current branch.
+- npm run changeset:version: Apply version/changelog updates from pending changesets.
 - npm run test: Run unit and component tests (Vitest).
 - npm run test:watch: Run Vitest in watch mode.
 - npm run test:coverage: Run Vitest with coverage.
@@ -59,10 +62,29 @@ Use [/.github/pull_request_template.md](../.github/pull_request_template.md) and
 
 Keep PRs scoped. Avoid bundling unrelated refactors with behavior changes.
 
+### Release notes and versioning
+
+For user-visible or behavior-changing work, include a `.changeset/*.md` entry in the PR.
+
+Create one with:
+
+```bash
+npm run changeset
+```
+
+Start each summary with a severity marker used by update UX automation:
+
+- `[severity:minor]`
+- `[severity:recommended-backup]`
+- `[severity:backup-required]`
+
+See [docs/versioning.md](./versioning.md) for full workflow.
+
 ## Testing expectations
 
 CI in [/.github/workflows/ci.yml](../.github/workflows/ci.yml) runs:
 
+0. Changeset Required (pull requests)
 1. Lint
 2. Unit/component tests
 3. Playwright e2e

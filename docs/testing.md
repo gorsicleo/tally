@@ -50,6 +50,7 @@ Scripts are defined in [package.json](../package.json).
 
 CI is defined in [/.github/workflows/ci.yml](../.github/workflows/ci.yml) and currently runs:
 
+0. Changeset Required (pull requests)
 1. Lint
 2. Unit and component tests (`npm test`)
 3. Playwright e2e (`npm run test:e2e`)
