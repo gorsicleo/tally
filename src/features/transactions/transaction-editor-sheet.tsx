@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getRecurringFrequencyLabel } from '../../domain/recurring'
 import { formatCompactDateLabel } from '../../domain/formatters'
+import { UNCATEGORIZED_CATEGORY_ID } from '../../domain/categories'
 import type {
   AddTransactionInput,
   TransactionRecurrenceInput,
@@ -158,7 +159,7 @@ function parseAmountInput(value: string): number {
 
 function getDefaultQuickCategoryId(categories: Category[]): string {
   return (
-    categories.find((category) => category.id === 'cat-uncategorized')?.id ??
+    categories.find((category) => category.id === UNCATEGORIZED_CATEGORY_ID)?.id ??
     categories[0]?.id ??
     ''
   )
@@ -216,6 +217,7 @@ export function TransactionEditorSheet({
   const [state, setState] = useState<'opening' | 'open' | 'closing'>('opening')
   const closingRef = useRef(false)
   const closeTimeoutRef = useRef<number | null>(null)
+  const hasHydratedDefaultsRef = useRef(false)
 
   const compatibleCategories = getCompatibleCategories(categories, type)
   const selectedCategoryId =
@@ -309,6 +311,15 @@ export function TransactionEditorSheet({
     }
   }, [])
 
+  useEffect(() => {
+    if (!hasHydratedDefaultsRef.current) {
+      hasHydratedDefaultsRef.current = true
+      return
+    }
+
+    persistTransactionSheetDefaults(sheetDefaults)
+  }, [sheetDefaults])
+
   const requestClose = (afterClose?: () => void) => {
     if (closingRef.current) {
       return
@@ -351,17 +362,13 @@ export function TransactionEditorSheet({
 
   const persistQuickCategoryChips = (nextQuickCategoryIds: string[]) => {
     setSheetDefaults((currentDefaults) => {
-      const nextDefaults: TransactionSheetDefaults = {
+      return {
         ...currentDefaults,
         quickCategoryByType: {
           ...currentDefaults.quickCategoryByType,
           [type]: nextQuickCategoryIds,
         },
       }
-
-      persistTransactionSheetDefaults(nextDefaults)
-
-      return nextDefaults
     })
   }
 
@@ -473,7 +480,6 @@ export function TransactionEditorSheet({
     }
 
     setSheetDefaults(nextDefaults)
-    persistTransactionSheetDefaults(nextDefaults)
 
     if (mode === 'edit' && initialTransaction) {
       onUpdate({
