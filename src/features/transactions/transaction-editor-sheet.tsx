@@ -34,6 +34,7 @@ interface TransactionEditorSheetProps {
 const SHEET_CLOSE_MS = 280
 const SHEET_DEFAULTS_KEY = 'tally.transaction-sheet.defaults.v1'
 const MAX_QUICK_CATEGORY_CHIPS = 5
+const AMOUNT_AUTOFOCUS_DELAY_MS = 48
 const AMOUNT_INPUT_PATTERN = '(?:\\d+(?:[.,]\\d{1,2})?|[.,]\\d{1,2})'
 const AMOUNT_INPUT_REGEX = /^(?:\d+(?:[.,]\d{1,2})?|[.,]\d{1,2})$/
 const AMOUNT_FORMAT_ERROR = 'Enter a valid amount (for example 12.50 or 12,50).'
@@ -41,11 +42,13 @@ const AMOUNT_FORMAT_ERROR = 'Enter a valid amount (for example 12.50 or 12,50).'
 interface TransactionSheetDefaults {
   lastType: TransactionType
   lastCategoryByType: Partial<Record<TransactionType, string>>
+  quickCategoryByType: Partial<Record<TransactionType, string[]>>
 }
 
 const EMPTY_SHEET_DEFAULTS: TransactionSheetDefaults = {
   lastType: 'expense',
   lastCategoryByType: {},
+  quickCategoryByType: {},
 }
 
 function isTransactionType(value: unknown): value is TransactionType {
@@ -73,12 +76,14 @@ function readTransactionSheetDefaults(): TransactionSheetDefaults {
     const candidate = parsed as {
       lastType?: unknown
       lastCategoryByType?: unknown
+      quickCategoryByType?: unknown
     }
     const normalizedDefaults: TransactionSheetDefaults = {
       lastType: isTransactionType(candidate.lastType)
         ? candidate.lastType
         : 'expense',
       lastCategoryByType: {},
+      quickCategoryByType: {},
     }
 
     if (
@@ -93,6 +98,22 @@ function readTransactionSheetDefaults(): TransactionSheetDefaults {
 
       if (typeof categoryByType.income === 'string') {
         normalizedDefaults.lastCategoryByType.income = categoryByType.income
+      }
+    }
+
+    if (candidate.quickCategoryByType && typeof candidate.quickCategoryByType === 'object') {
+      const quickCategoryByType = candidate.quickCategoryByType as Record<string, unknown>
+
+      if (Array.isArray(quickCategoryByType.expense)) {
+        normalizedDefaults.quickCategoryByType.expense = quickCategoryByType.expense
+          .filter((value): value is string => typeof value === 'string')
+          .slice(0, MAX_QUICK_CATEGORY_CHIPS)
+      }
+
+      if (Array.isArray(quickCategoryByType.income)) {
+        normalizedDefaults.quickCategoryByType.income = quickCategoryByType.income
+          .filter((value): value is string => typeof value === 'string')
+          .slice(0, MAX_QUICK_CATEGORY_CHIPS)
       }
     }
 
@@ -133,6 +154,14 @@ function parseAmountInput(value: string): number {
   }
 
   return Number(trimmedValue.replace(',', '.'))
+}
+
+function getDefaultQuickCategoryId(categories: Category[]): string {
+  return (
+    categories.find((category) => category.id === 'cat-uncategorized')?.id ??
+    categories[0]?.id ??
+    ''
+  )
 }
 
 export function TransactionEditorSheet({
@@ -193,28 +222,30 @@ export function TransactionEditorSheet({
     compatibleCategories.find((category) => category.id === categoryId)?.id ??
     compatibleCategories[0]?.id ??
     ''
-  const quickCategoryOptions = useMemo(() => {
-    const firstCategories = compatibleCategories.slice(0, MAX_QUICK_CATEGORY_CHIPS)
+  const quickCategoryIds = useMemo(() => {
+    const configuredCategoryIds = sheetDefaults.quickCategoryByType[type] ?? []
+    const validConfiguredCategoryIds = configuredCategoryIds.filter((configuredId) =>
+      compatibleCategories.some((category) => category.id === configuredId),
+    )
 
-    if (
-      selectedCategoryId &&
-      !firstCategories.some((category) => category.id === selectedCategoryId)
-    ) {
-      const selectedCategory = compatibleCategories.find(
-        (category) => category.id === selectedCategoryId,
+    if (validConfiguredCategoryIds.length > 0) {
+      return Array.from(new Set(validConfiguredCategoryIds)).slice(
+        0,
+        MAX_QUICK_CATEGORY_CHIPS,
       )
-
-      if (selectedCategory) {
-        return [
-          selectedCategory,
-          ...firstCategories.slice(0, MAX_QUICK_CATEGORY_CHIPS - 1),
-        ]
-      }
     }
 
-    return firstCategories
-  }, [compatibleCategories, selectedCategoryId])
-  const hasMoreCategories = compatibleCategories.length > MAX_QUICK_CATEGORY_CHIPS
+    return compatibleCategories
+      .slice(0, MAX_QUICK_CATEGORY_CHIPS)
+      .map((category) => category.id)
+  }, [compatibleCategories, sheetDefaults.quickCategoryByType, type])
+  const quickCategoryOptions = useMemo(() => {
+    return quickCategoryIds
+      .map((categoryIdFromDefaults) =>
+        compatibleCategories.find((category) => category.id === categoryIdFromDefaults),
+      )
+      .filter((category): category is Category => Boolean(category))
+  }, [compatibleCategories, quickCategoryIds])
   const recurringSummary = showRecurringOptions
     ? getRecurringFrequencyLabel({
         frequency: recurringFrequency,
@@ -229,25 +260,36 @@ export function TransactionEditorSheet({
     const frame = window.requestAnimationFrame(() => {
       setState('open')
     })
-    const autofocusTimeout =
-      mode === 'create'
-        ? window.setTimeout(() => {
-            amountInputRef.current?.focus()
-            amountInputRef.current?.select()
-          }, 120)
-        : null
 
     return () => {
       window.cancelAnimationFrame(frame)
-      if (autofocusTimeout !== null) {
-        window.clearTimeout(autofocusTimeout)
-      }
 
       if (closeTimeoutRef.current !== null) {
         window.clearTimeout(closeTimeoutRef.current)
       }
     }
   }, [mode])
+
+  useEffect(() => {
+    if (mode !== 'create' || state !== 'open') {
+      return
+    }
+
+    const autofocusTimeout = window.setTimeout(() => {
+      const amountInput = amountInputRef.current
+
+      if (!amountInput) {
+        return
+      }
+
+      amountInput.focus({ preventScroll: true })
+      amountInput.select()
+    }, AMOUNT_AUTOFOCUS_DELAY_MS)
+
+    return () => {
+      window.clearTimeout(autofocusTimeout)
+    }
+  }, [mode, state])
 
   useEffect(() => {
     if (typeof document === 'undefined') {
@@ -305,6 +347,56 @@ export function TransactionEditorSheet({
     }
 
     setCategoryId(nextCompatibleCategories[0]?.id ?? '')
+  }
+
+  const persistQuickCategoryChips = (nextQuickCategoryIds: string[]) => {
+    setSheetDefaults((currentDefaults) => {
+      const nextDefaults: TransactionSheetDefaults = {
+        ...currentDefaults,
+        quickCategoryByType: {
+          ...currentDefaults.quickCategoryByType,
+          [type]: nextQuickCategoryIds,
+        },
+      }
+
+      persistTransactionSheetDefaults(nextDefaults)
+
+      return nextDefaults
+    })
+  }
+
+  const handleSelectCategory = (nextCategoryId: string) => {
+    setCategoryId(nextCategoryId)
+    setError(null)
+
+    const existingCategoryIds = quickCategoryIds.filter(
+      (categoryIdValue) => categoryIdValue !== nextCategoryId,
+    )
+    const nextQuickCategoryIds = [nextCategoryId, ...existingCategoryIds].slice(
+      0,
+      MAX_QUICK_CATEGORY_CHIPS,
+    )
+
+    persistQuickCategoryChips(nextQuickCategoryIds)
+  }
+
+  const handleRemoveQuickCategoryChip = (categoryIdToRemove: string) => {
+    const filteredQuickCategoryIds = quickCategoryIds.filter(
+      (chipCategoryId) => chipCategoryId !== categoryIdToRemove,
+    )
+    const fallbackCategoryId = getDefaultQuickCategoryId(compatibleCategories)
+    const nextQuickCategoryIds =
+      filteredQuickCategoryIds.length > 0 || !fallbackCategoryId
+        ? filteredQuickCategoryIds
+        : [fallbackCategoryId]
+
+    persistQuickCategoryChips(nextQuickCategoryIds)
+
+    if (selectedCategoryId === categoryIdToRemove) {
+      setCategoryId(nextQuickCategoryIds[0] ?? fallbackCategoryId)
+    }
+
+    setError(null)
   }
 
   const handleDelete = () => {
@@ -374,6 +466,10 @@ export function TransactionEditorSheet({
         ...sheetDefaults.lastCategoryByType,
         ...(selectedCategoryId ? { [type]: selectedCategoryId } : {}),
       },
+      quickCategoryByType: {
+        ...sheetDefaults.quickCategoryByType,
+        [type]: quickCategoryIds,
+      },
     }
 
     setSheetDefaults(nextDefaults)
@@ -429,9 +525,38 @@ export function TransactionEditorSheet({
               {mode === 'edit' ? 'Update transaction' : 'Add transaction'}
             </h3>
           </div>
+
+          <button
+            type="button"
+            className="icon-button sheet-close-button"
+            aria-label="Close transaction editor"
+            title="Close"
+            onClick={() => requestClose()}
+          >
+            <span aria-hidden="true">&#215;</span>
+          </button>
         </div>
 
         <form className="field-grid transaction-sheet-form" onSubmit={handleSubmit}>
+          <div className="sheet-amount-field">
+            <input
+              ref={amountInputRef}
+              type="text"
+              inputMode="decimal"
+              pattern={AMOUNT_INPUT_PATTERN}
+              value={amount}
+              onChange={(event) => {
+                setAmount(event.target.value)
+                setError(null)
+              }}
+              placeholder="0.00"
+              aria-label="Amount"
+              className="sheet-amount-input"
+              autoFocus={mode === 'create'}
+              required
+            />
+          </div>
+
           <div className="type-toggle" role="group" aria-label="Transaction type">
             <button
               type="button"
@@ -449,64 +574,55 @@ export function TransactionEditorSheet({
             </button>
           </div>
 
-          <div className="sheet-amount-field">
-            <input
-              ref={amountInputRef}
-              type="text"
-              inputMode="decimal"
-              pattern={AMOUNT_INPUT_PATTERN}
-              value={amount}
-              onChange={(event) => {
-                setAmount(event.target.value)
-                setError(null)
-              }}
-              placeholder="0.00"
-              aria-label="Amount"
-              className="sheet-amount-input"
-              required
-            />
-          </div>
-
           <div className="sheet-category-section">
-            <div className="sheet-inline-row">
-              <span className="sheet-inline-label">Category</span>
-              {hasMoreCategories ? (
-                <button
-                  type="button"
-                  className="text-button sheet-inline-link"
-                  onClick={() => setShowCategoryPicker((current) => !current)}
-                >
-                  {showCategoryPicker ? 'Hide all' : 'More'}
-                </button>
-              ) : null}
-            </div>
+            <span className="sheet-inline-label">Category</span>
 
             <div className="quick-category-chips" role="group" aria-label="Quick categories">
               {quickCategoryOptions.map((category) => (
-                <button
+                <div
                   key={category.id}
-                  type="button"
                   className={
                     `quick-category-chip ${selectedCategoryId === category.id ? 'active' : ''}`.trim()
                   }
-                  onClick={() => {
-                    setCategoryId(category.id)
-                    setError(null)
-                  }}
                 >
-                  {category.name}
-                </button>
+                  <button
+                    type="button"
+                    className="quick-category-chip-select"
+                    onClick={() => handleSelectCategory(category.id)}
+                    aria-pressed={selectedCategoryId === category.id}
+                  >
+                    {category.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="quick-category-chip-remove"
+                    aria-label={`Remove ${category.name} quick chip`}
+                    onClick={() => handleRemoveQuickCategoryChip(category.id)}
+                  >
+                    -
+                  </button>
+                </div>
               ))}
+
+              <button
+                type="button"
+                className="quick-category-add-chip"
+                onClick={() => setShowCategoryPicker((current) => !current)}
+                aria-expanded={showCategoryPicker}
+                aria-controls="all-categories-select"
+              >
+                + Category
+              </button>
             </div>
 
             {showCategoryPicker ? (
               <label className="sheet-select-label">
                 All categories
                 <select
+                  id="all-categories-select"
                   value={selectedCategoryId}
                   onChange={(event) => {
-                    setCategoryId(event.target.value)
-                    setError(null)
+                    handleSelectCategory(event.target.value)
                   }}
                   required
                 >
@@ -520,15 +636,29 @@ export function TransactionEditorSheet({
             ) : null}
           </div>
 
-          <div className="sheet-inline-row">
-            <span className="sheet-inline-label">Date</span>
+          <div className="sheet-secondary-chips" role="group" aria-label="Secondary options">
             <button
               type="button"
-              className="ghost-button compact sheet-inline-button"
+              className="ghost-button compact sheet-inline-chip"
               onClick={() => setShowDatePicker((current) => !current)}
+              aria-expanded={showDatePicker}
             >
-              {dateLabel}
+              Date: {dateLabel}
             </button>
+
+            {mode === 'create' ? (
+              <button
+                type="button"
+                className={`ghost-button compact sheet-inline-chip ${showRecurringOptions ? 'active' : ''}`.trim()}
+                onClick={() => {
+                  setShowRecurringOptions((current) => !current)
+                  setError(null)
+                }}
+                aria-expanded={showRecurringOptions}
+              >
+                Repeat: {recurringSummary}
+              </button>
+            ) : null}
           </div>
 
           {showDatePicker ? (
@@ -552,82 +682,68 @@ export function TransactionEditorSheet({
           ) : null}
 
           {mode === 'create' ? (
-            <div className="sheet-recurring-section">
-              <button
-                type="button"
-                className="sheet-recurring-toggle"
-                onClick={() => {
-                  setShowRecurringOptions((current) => !current)
-                  setError(null)
-                }}
-              >
-                <span className="sheet-inline-label">Repeat</span>
-                <span className="sheet-recurring-summary">{recurringSummary}</span>
-              </button>
+            showRecurringOptions ? (
+              <div className="sheet-recurring-fields compact">
+                <div className="pill-switch" role="group" aria-label="Recurring frequency">
+                  <button
+                    type="button"
+                    className={recurringFrequency === 'monthly' ? 'active' : ''}
+                    onClick={() => {
+                      setRecurringFrequency('monthly')
+                      setError(null)
+                    }}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    className={recurringFrequency === 'custom' ? 'active' : ''}
+                    onClick={() => {
+                      setRecurringFrequency('custom')
+                      setError(null)
+                    }}
+                  >
+                    Custom
+                  </button>
+                </div>
 
-              {showRecurringOptions ? (
-                <div className="sheet-recurring-fields">
-                  <div className="pill-switch" role="group" aria-label="Recurring frequency">
-                    <button
-                      type="button"
-                      className={recurringFrequency === 'monthly' ? 'active' : ''}
-                      onClick={() => {
-                        setRecurringFrequency('monthly')
-                        setError(null)
-                      }}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      type="button"
-                      className={recurringFrequency === 'custom' ? 'active' : ''}
-                      onClick={() => {
-                        setRecurringFrequency('custom')
-                        setError(null)
-                      }}
-                    >
-                      Custom
-                    </button>
-                  </div>
-
-                  {recurringFrequency === 'custom' ? (
-                    <label className="sheet-select-label">
-                      Repeat every how many days?
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={recurringIntervalDays}
-                        onChange={(event) => {
-                          setRecurringIntervalDays(event.target.value)
-                          setError(null)
-                        }}
-                        required
-                      />
-                    </label>
-                  ) : null}
-
+                {recurringFrequency === 'custom' ? (
                   <label className="sheet-select-label">
-                    Start date
+                    Repeat every how many days?
                     <input
-                      type="date"
-                      min={occurredAt}
-                      value={recurringStartDate}
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={recurringIntervalDays}
                       onChange={(event) => {
-                        setRecurringStartDate(event.target.value)
-                        setHasEditedRecurringStartDate(true)
+                        setRecurringIntervalDays(event.target.value)
                         setError(null)
                       }}
                       required
                     />
                   </label>
+                ) : null}
 
-                  <p className="support-copy sheet-recurring-help">
-                    Due items stay visible on Home until you confirm them.
-                  </p>
-                </div>
-              ) : null}
-            </div>
+                <label className="sheet-select-label">
+                  Start date
+                  <input
+                    type="date"
+                    min={occurredAt}
+                    value={recurringStartDate}
+                    onChange={(event) => {
+                      setRecurringStartDate(event.target.value)
+                      setHasEditedRecurringStartDate(true)
+                      setError(null)
+                    }}
+                    required
+                  />
+                </label>
+
+                <p className="support-copy sheet-recurring-help">
+                  Due items stay visible on Home until you confirm them.
+                </p>
+              </div>
+            ) : null
           ) : recurringTemplate ? (
             <div className="sheet-recurring-origin-card">
               <p className="sheet-recurring-origin-title">

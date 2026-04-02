@@ -1943,7 +1943,7 @@ textarea {
   backdrop-filter: blur(0px);
   -webkit-backdrop-filter: blur(0px);
   display: grid;
-  align-items: end;
+  align-items: center;
   padding: 14px;
   opacity: 0;
   transition:
@@ -1974,7 +1974,7 @@ textarea {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   transform: translate3d(0, 28px, 0) scale(0.97);
-  transform-origin: bottom center;
+  transform-origin: center;
   opacity: 0;
   box-shadow: 0 36px 90px rgba(0, 0, 0, 0.38);
   transition:
@@ -2039,13 +2039,30 @@ textarea {
   font-size: clamp(1rem, 4vw, 1.16rem);
 }
 
+.sheet-close-button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sheet-close-button:hover {
+  color: var(--text-primary);
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .sheet-header .icon-button {
   align-self: flex-start;
   margin-bottom: 4px;
 }
 
 .transaction-sheet-form {
-  gap: 14px;
+  gap: 12px;
 }
 
 .sheet-amount-field {
@@ -2080,7 +2097,7 @@ textarea {
 
 .sheet-category-section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .sheet-inline-row {
@@ -2114,14 +2131,16 @@ textarea {
 }
 
 .quick-category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--text-secondary);
-  padding: 8px 12px;
+  padding: 3px 4px 3px 10px;
   font-size: 0.8rem;
   font-weight: 700;
-  cursor: pointer;
   transition:
     transform 0.22s ease,
     border-color 0.22s ease,
@@ -2137,6 +2156,63 @@ textarea {
   color: var(--text-primary);
   border-color: rgba(20, 241, 217, 0.28);
   background: linear-gradient(135deg, rgba(20, 241, 217, 0.16), rgba(93, 124, 255, 0.18));
+}
+
+.quick-category-chip-select,
+.quick-category-chip-remove {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.quick-category-chip-select {
+  font-weight: 700;
+  padding: 4px 2px;
+}
+
+.quick-category-chip-remove {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+.quick-category-add-chip {
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sheet-secondary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sheet-inline-chip {
+  font-size: 0.78rem;
+  padding: 8px 12px;
+}
+
+.sheet-inline-chip.active {
+  border-color: rgba(20, 241, 217, 0.26);
+  color: var(--text-primary);
+  background: rgba(20, 241, 217, 0.12);
+}
+
+.sheet-recurring-fields.compact {
+  padding-top: 2px;
 }
 
 .sheet-select-label,

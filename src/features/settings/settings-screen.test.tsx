@@ -168,7 +168,7 @@ describe('SettingsScreen direct flows', () => {
   })
 
   it('ignores escape and backdrop dismissal while app info is copying', async () => {
-    let resolveCopy: ((value: boolean) => void) | null = null
+    let resolveCopy!: (value: boolean) => void
     clipboardState.copySpy.mockImplementationOnce(
       () =>
         new Promise<boolean>((resolve) => {
@@ -189,7 +189,7 @@ describe('SettingsScreen direct flows', () => {
 
     expect(screen.getByRole('dialog', { name: 'Report a bug' })).toBeInTheDocument()
 
-    resolveCopy?.(true)
+    resolveCopy(true)
 
     await waitFor(() => {
       expect(onShowToast).toHaveBeenCalledWith('App info copied.')

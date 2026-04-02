@@ -133,7 +133,7 @@ describe('TransactionEditorSheet', () => {
       },
     )
 
-    expect(JSON.parse(window.localStorage.getItem(SHEET_DEFAULTS_KEY) ?? '{}')).toEqual({
+    expect(JSON.parse(window.localStorage.getItem(SHEET_DEFAULTS_KEY) ?? '{}')).toMatchObject({
       lastType: 'income',
       lastCategoryByType: {
         income: 'cat-freelance',
@@ -147,9 +147,9 @@ describe('TransactionEditorSheet', () => {
     fireEvent.change(screen.getByLabelText('Amount'), {
       target: { value: '42.5' },
     })
-    await user.click(screen.getByRole('button', { name: 'More' }))
+    await user.click(screen.getByRole('button', { name: '+ Category' }))
     await user.selectOptions(screen.getByLabelText('All categories'), 'cat-fun')
-    await user.click(screen.getByRole('button', { name: 'Today' }))
+    await user.click(screen.getByRole('button', { name: /Date: Today/i }))
     fireEvent.change(screen.getByLabelText('Transaction date'), {
       target: { value: '2026-03-22' },
     })
@@ -167,6 +167,58 @@ describe('TransactionEditorSheet', () => {
       },
       null,
     )
+  })
+
+  it('focuses the amount input when opening in create mode', () => {
+    renderSheet()
+
+    expect(screen.getByLabelText('Amount')).toHaveFocus()
+  })
+
+  it('supports adding and removing quick category chips', async () => {
+    const { user } = renderSheet()
+
+    expect(screen.queryByRole('button', { name: 'Fun' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '+ Category' }))
+    await user.selectOptions(screen.getByLabelText('All categories'), 'cat-fun')
+
+    expect(screen.getByRole('button', { name: 'Fun' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Fun quick chip' }))
+
+    expect(screen.queryByRole('button', { name: 'Fun' })).not.toBeInTheDocument()
+
+    let nonUncategorizedRemoveButtons = screen
+      .getAllByRole('button', { name: /Remove .* quick chip/ })
+      .filter((button) => !button.getAttribute('aria-label')?.includes('Uncategorized'))
+
+    while (nonUncategorizedRemoveButtons.length > 0) {
+      await user.click(nonUncategorizedRemoveButtons[0])
+
+      nonUncategorizedRemoveButtons = screen
+        .getAllByRole('button', { name: /Remove .* quick chip/ })
+        .filter((button) => !button.getAttribute('aria-label')?.includes('Uncategorized'))
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Remove Uncategorized quick chip' }))
+
+    expect(screen.getByRole('button', { name: 'Uncategorized' })).toBeInTheDocument()
+  })
+
+  it('provides a close button in the sheet header', () => {
+    vi.useFakeTimers()
+    const { onClose } = renderSheet()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close transaction editor' }))
+
+    expect(onClose).not.toHaveBeenCalled()
+
+    act(() => {
+      vi.advanceTimersByTime(300)
+    })
+
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('accepts a comma as the decimal separator', async () => {
