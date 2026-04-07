@@ -194,14 +194,12 @@ export function TransactionEditorSheet({
   const [amount, setAmount] = useState(
     initialTransaction ? String(initialTransaction.amount) : '',
   )
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
   const [categoryId, setCategoryId] = useState(initialCategory)
   const [occurredAt, setOccurredAt] = useState(
     initialTransaction?.occurredAt ?? todayDate,
   )
   const [note, setNote] = useState(initialTransaction?.note ?? '')
-  const [showDatePicker, setShowDatePicker] = useState(
-    Boolean(initialTransaction && initialTransaction.occurredAt !== todayDate),
-  )
   const [showNoteInput, setShowNoteInput] = useState(
     Boolean(initialTransaction?.note),
   )
@@ -424,6 +422,27 @@ export function TransactionEditorSheet({
     })
   }
 
+  const openDatePicker = () => {
+    const dateInput = dateInputRef.current
+
+    if (!dateInput) {
+      return
+    }
+
+    dateInput.focus({ preventScroll: true })
+
+    if (typeof dateInput.showPicker === 'function') {
+      try {
+        dateInput.showPicker()
+        return
+      } catch {
+        // Ignore and fallback to click for browsers with stricter picker constraints.
+      }
+    }
+
+    dateInput.click()
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -506,8 +525,11 @@ export function TransactionEditorSheet({
     requestClose()
   }
 
+  const hasValidOccurredAt = /^\d{4}-\d{2}-\d{2}$/.test(occurredAt)
   const dateLabel =
-    occurredAt === todayDate ? 'Today' : formatCompactDateLabel(occurredAt)
+    occurredAt === todayDate || !hasValidOccurredAt
+      ? 'Today'
+      : formatCompactDateLabel(occurredAt)
 
   return (
     <div
@@ -642,15 +664,32 @@ export function TransactionEditorSheet({
             ) : null}
           </div>
 
+          <div className="sheet-section-separator" aria-hidden="true" />
+
           <div className="sheet-secondary-chips" role="group" aria-label="Secondary options">
-            <button
-              type="button"
-              className="ghost-button compact sheet-inline-chip"
-              onClick={() => setShowDatePicker((current) => !current)}
-              aria-expanded={showDatePicker}
+            <label
+              className="ghost-button compact sheet-inline-chip sheet-inline-date-chip"
+              onClick={openDatePicker}
             >
-              Date: {dateLabel}
-            </button>
+              <span>Date: {dateLabel}</span>
+              <input
+                ref={dateInputRef}
+                type="date"
+                className="sheet-date-input-tap-target"
+                aria-label="Transaction date"
+                value={hasValidOccurredAt ? occurredAt : todayDate}
+                onChange={(event) => {
+                  const nextOccurredAt = event.target.value || todayDate
+
+                  setOccurredAt(nextOccurredAt)
+
+                  if (!hasEditedRecurringStartDate) {
+                    setRecurringStartDate(nextOccurredAt)
+                  }
+                }}
+                required
+              />
+            </label>
 
             {mode === 'create' ? (
               <button
@@ -666,26 +705,6 @@ export function TransactionEditorSheet({
               </button>
             ) : null}
           </div>
-
-          {showDatePicker ? (
-            <label className="sheet-select-label">
-              Transaction date
-              <input
-                type="date"
-                value={occurredAt}
-                onChange={(event) => {
-                  const nextOccurredAt = event.target.value
-
-                  setOccurredAt(nextOccurredAt)
-
-                  if (!hasEditedRecurringStartDate) {
-                    setRecurringStartDate(nextOccurredAt)
-                  }
-                }}
-                required
-              />
-            </label>
-          ) : null}
 
           {mode === 'create' ? (
             showRecurringOptions ? (

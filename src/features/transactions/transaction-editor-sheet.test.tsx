@@ -149,7 +149,6 @@ describe('TransactionEditorSheet', () => {
     })
     await user.click(screen.getByRole('button', { name: '+ Category' }))
     await user.selectOptions(screen.getByLabelText('All categories'), 'cat-fun')
-    await user.click(screen.getByRole('button', { name: /Date: Today/i }))
     fireEvent.change(screen.getByLabelText('Transaction date'), {
       target: { value: '2026-03-22' },
     })
@@ -164,6 +163,29 @@ describe('TransactionEditorSheet', () => {
         categoryId: 'cat-fun',
         note: 'Movie night',
         occurredAt: '2026-03-22',
+      },
+      null,
+    )
+  })
+
+  it('falls back to today when date picker value is cleared', async () => {
+    const { user, onCreate } = renderSheet()
+
+    fireEvent.change(screen.getByLabelText('Amount'), {
+      target: { value: '14' },
+    })
+    fireEvent.change(screen.getByLabelText('Transaction date'), {
+      target: { value: '' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(onCreate).toHaveBeenCalledWith(
+      {
+        type: 'expense',
+        amount: 14,
+        categoryId: 'cat-uncategorized',
+        note: '',
+        occurredAt: getTodayLocalDate(),
       },
       null,
     )
