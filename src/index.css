@@ -2200,9 +2200,31 @@ textarea {
   gap: 8px;
 }
 
+.sheet-section-separator {
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--line-strong), transparent);
+  opacity: 0.85;
+}
+
 .sheet-inline-chip {
   font-size: 0.78rem;
   padding: 8px 12px;
+}
+
+.sheet-inline-date-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.sheet-date-input-tap-target {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .sheet-inline-chip.active {
