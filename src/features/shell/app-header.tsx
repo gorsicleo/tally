@@ -1,24 +1,12 @@
 interface AppHeaderProps {
   title: string
-  subtitle: string
-  variant?: 'default' | 'compact'
 }
 
-export function AppHeader({
-  title,
-  subtitle,
-  variant = 'default',
-}: AppHeaderProps) {
+export function AppHeader({ title }: AppHeaderProps) {
   return (
-    <header
-      className={
-        `panel app-header no-meta ${variant === 'compact' ? 'compact' : ''}`.trim()
-      }
-    >
+    <header className="app-header" aria-live="polite">
       <div className="app-header-copy">
-        <p className="brand-mark">TALLY</p>
         <h1>{title}</h1>
-        <p>{subtitle}</p>
       </div>
     </header>
   )

@@ -6,9 +6,7 @@ import {
   evaluateBackupReminder,
   getBackupReminderBody,
 } from './backup/backup-reminder-service'
-import { formatMonthLabel } from './domain/formatters'
 import { getNextRecurringDate } from './domain/recurring'
-import { getMonthKey } from './domain/selectors'
 import {
   BackupReminderCard,
   PrivacyFirstModal,
@@ -19,7 +17,6 @@ import { AppHeader } from './features/shell/app-header'
 import { TabBar, type AppTab } from './features/shell/tab-bar'
 import {
   getActiveTabMeta,
-  getHeaderVariant,
 } from './features/shell/app-tab-metadata'
 import { AppScreenResolver } from './features/shell/app-screen-resolver'
 import { useEditorOrchestration } from './features/shell/use-editor-orchestration'
@@ -65,7 +62,6 @@ function FinanceWorkspace() {
   const toastTimeoutRef = useRef<number | null>(null)
   const reminderTimeoutRef = useRef<number | null>(null)
   const hasShownBackupReminderInSession = useRef(false)
-  const currentMonthLabel = useMemo(() => formatMonthLabel(getMonthKey()), [])
   const backupReminderDecision = useMemo(
     () => evaluateBackupReminder(state),
     [state],
@@ -79,8 +75,7 @@ function FinanceWorkspace() {
     setActiveTab(tab)
   }
 
-  const activeMeta = getActiveTabMeta(activeTab, currentMonthLabel)
-  const headerVariant = getHeaderVariant(activeTab)
+  const activeMeta = getActiveTabMeta(activeTab)
 
   useEffect(() => {
     return () => {
@@ -274,8 +269,6 @@ function FinanceWorkspace() {
       <AppHeader
         key={activeTab}
         title={activeMeta.title}
-        subtitle={activeMeta.subtitle}
-        variant={headerVariant}
       />
 
       <main className="app-main">
