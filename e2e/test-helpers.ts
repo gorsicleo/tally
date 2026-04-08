@@ -67,6 +67,15 @@ export async function disableAnimations(page: Page) {
         animation: none !important;
         caret-color: transparent !important;
       }
+
+      /* Avoid CI font network/runtime variance in visual snapshots. */
+      html, body, input, button, select, textarea {
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+      }
+
+      h1, h2, h3, h4, h5, h6, strong {
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+      }
     `,
   })
 }
