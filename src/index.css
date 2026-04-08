@@ -247,7 +247,7 @@ textarea {
   gap: 4px;
 }
 
-.app-header h4 {
+.app-header h1 {
   font-size: clamp(1.4rem, 4.2vw, 2rem);
   line-height: 1.08;
 }
