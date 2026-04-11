@@ -473,8 +473,9 @@ textarea:focus-visible {
 .update-changelog-list {
   display: grid;
   gap: 8px;
-  margin: 4px 0 0;
-  padding-left: 18px;
+  margin: 0;
+  padding-left: 0;
+  list-style-position: inside;
   color: var(--text-secondary);
 }
 
