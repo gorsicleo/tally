@@ -77,6 +77,23 @@ describe('UpdateManager', () => {
     expect(hookState.value.applyUpdate).toHaveBeenCalled()
   })
 
+  it('collapses long changelog entries and expands on demand', async () => {
+    const { user } = renderWithUser(
+      <UpdateManager onCreateBackup={vi.fn(async () => true)} />,
+    )
+
+    expect(screen.getByText('Improved charts')).toBeInTheDocument()
+    expect(screen.getByText('Safer backups')).toBeInTheDocument()
+    expect(screen.getByText('Update prompt')).toBeInTheDocument()
+    expect(screen.queryByText('Ignored')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
+
+    expect(screen.getByText('Ignored')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument()
+  })
+
   it('does not render when no update is available', () => {
     hookState.value = {
       ...hookState.value,
