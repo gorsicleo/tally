@@ -46,7 +46,7 @@ function stripSeverityMarker(entry: string): {
 
   return {
     text: entry.replace(match[0], '').trim(),
-    severity: parseSeverity(match[1]),
+    severity: parseSeverity(match[1].toLowerCase()),
   }
 }
 
@@ -82,7 +82,8 @@ function getChangesetMetadata(): {
       .sort((left, right) => left.localeCompare(right))
 
     const changelogEntries: string[] = []
-    let highestSeverity: AppUpdateSeverity = 'recommended-backup'
+    let highestSeverity: AppUpdateSeverity = 'minor'
+    let hasSeverityMarker = false
 
     for (const fileName of changesetFiles) {
       const markdown = readFileSync(join(CHANGESET_DIR, fileName), 'utf8')
@@ -98,8 +99,12 @@ function getChangesetMetadata(): {
       for (const line of bodyLines) {
         const { text, severity } = stripSeverityMarker(line)
 
-        if (severity && severityPriority[severity] > severityPriority[highestSeverity]) {
-          highestSeverity = severity
+        if (severity) {
+          hasSeverityMarker = true
+
+          if (severityPriority[severity] > severityPriority[highestSeverity]) {
+            highestSeverity = severity
+          }
         }
 
         if (text.length > 0) {
@@ -110,7 +115,7 @@ function getChangesetMetadata(): {
 
     return {
       changelog: changelogEntries.length > 0 ? changelogEntries : fallbackChangelog,
-      severity: highestSeverity,
+      severity: hasSeverityMarker ? highestSeverity : 'recommended-backup',
     }
   } catch {
     return {

@@ -214,7 +214,7 @@ describe('budget allocation selectors', () => {
 describe('getRecentTransactions', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-04-11T10:00:00.000Z'))
+    vi.setSystemTime(new Date(2026, 3, 11, 12, 0, 0))
   })
 
   afterEach(() => {
