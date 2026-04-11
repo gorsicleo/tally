@@ -474,7 +474,8 @@ textarea:focus-visible {
   display: grid;
   gap: 8px;
   margin: 0;
-  padding-left: 18px;
+  padding-left: 0;
+  list-style-position: inside;
   color: var(--text-secondary);
 }
 
