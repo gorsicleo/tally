@@ -500,7 +500,8 @@ textarea:focus-visible {
 .update-changelog-toggle {
   justify-self: flex-start;
   font-size: 0.86rem;
-  padding: 0;
+  padding-block: 4px;
+  padding-inline: 0;
 }
 
 .backup-modal-actions {
