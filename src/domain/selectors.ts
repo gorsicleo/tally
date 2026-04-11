@@ -6,6 +6,7 @@ import type {
   TransactionType,
 } from './models'
 import { computeBudgetSpending } from './budget-service'
+import { compareLocalDateKeys, getTodayLocalDate } from '../utils/date'
 
 export interface OverviewTotals {
   balance: number
@@ -212,7 +213,14 @@ export function getRecentTransactions(
   state: FinanceState,
   limit = 5,
 ): Transaction[] {
-  return getSortedTransactions(state.transactions).slice(0, limit)
+  const todayLocalDate = getTodayLocalDate()
+
+  return getSortedTransactions(
+    state.transactions.filter(
+      (transaction) =>
+        compareLocalDateKeys(transaction.occurredAt, todayLocalDate) <= 0,
+    ),
+  ).slice(0, limit)
 }
 
 export function getCategoryTotals(

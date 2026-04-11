@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialFinanceState } from './default-data'
 import type { Budget, FinanceState, Transaction, TransactionType } from './models'
 import {
   getAvailableToBudgetForPeriod,
   getBudgetAllocationSummary,
+  getRecentTransactions,
   getOverAllocatedAmountForPeriod,
   getTotalAllocatedBudgetLimitsForPeriod,
   getTotalIncomeForPeriod,
@@ -207,5 +208,63 @@ describe('budget allocation selectors', () => {
       totalAllocatedBudgetLimitsForPeriod: 300,
       availableToBudgetForPeriod: 400,
     })
+  })
+})
+
+describe('getRecentTransactions', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-11T10:00:00.000Z'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('excludes future transactions and keeps past/today sorted newest-first', () => {
+    const state = createState({
+      transactions: [
+        createTransaction('expense', 15, '2026-04-12', {
+          id: 'txn-future',
+          createdAt: '2026-04-12T09:00:00.000Z',
+        }),
+        createTransaction('expense', 25, '2026-04-11', {
+          id: 'txn-today',
+          createdAt: '2026-04-11T10:00:00.000Z',
+        }),
+        createTransaction('expense', 35, '2026-04-10', {
+          id: 'txn-past-late',
+          createdAt: '2026-04-10T11:00:00.000Z',
+        }),
+        createTransaction('expense', 45, '2026-04-10', {
+          id: 'txn-past-early',
+          createdAt: '2026-04-10T08:00:00.000Z',
+        }),
+      ],
+    })
+
+    const recent = getRecentTransactions(state, 6)
+
+    expect(recent.map((transaction) => transaction.id)).toEqual([
+      'txn-today',
+      'txn-past-late',
+      'txn-past-early',
+    ])
+    expect(recent.every((transaction) => transaction.occurredAt <= '2026-04-11')).toBe(
+      true,
+    )
+  })
+
+  it('includes transactions dated exactly today', () => {
+    const state = createState({
+      transactions: [
+        createTransaction('expense', 19, '2026-04-11', { id: 'txn-today' }),
+      ],
+    })
+
+    const recent = getRecentTransactions(state, 1)
+
+    expect(recent).toHaveLength(1)
+    expect(recent[0]?.id).toBe('txn-today')
   })
 })
