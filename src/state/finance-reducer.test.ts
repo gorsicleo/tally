@@ -142,6 +142,65 @@ describe('financeReducer transaction flows', () => {
 })
 
 describe('financeReducer category and budget safety', () => {
+  it('normalizes recurring flag when setting budgets', () => {
+    const categoryId = findCategoryIdByName('Food')
+    const state = cloneState()
+
+    const recurringTrueState = financeReducer(state, {
+      type: 'set-budget',
+      payload: {
+        id: 'budget-recurring-true',
+        name: 'Recurring true',
+        categoryIds: [categoryId],
+        monthKey: '2026-04',
+        limit: 150,
+        recurring: true,
+        createdAt: '2026-04-01T10:00:00.000Z',
+        updatedAt: '2026-04-01T10:00:00.000Z',
+      },
+    })
+
+    const recurringFalseState = financeReducer(recurringTrueState, {
+      type: 'set-budget',
+      payload: {
+        id: 'budget-recurring-false',
+        name: 'Recurring false',
+        categoryIds: [categoryId],
+        monthKey: '2026-04',
+        limit: 160,
+        recurring: false,
+        createdAt: '2026-04-01T10:00:00.000Z',
+        updatedAt: '2026-04-01T10:00:00.000Z',
+      },
+    })
+
+    const recurringMissingState = financeReducer(recurringFalseState, {
+      type: 'set-budget',
+      payload: {
+        id: 'budget-recurring-missing',
+        name: 'Recurring missing',
+        categoryIds: [categoryId],
+        monthKey: '2026-04',
+        limit: 170,
+        createdAt: '2026-04-01T10:00:00.000Z',
+        updatedAt: '2026-04-01T10:00:00.000Z',
+      },
+    })
+
+    expect(
+      recurringMissingState.budgets.find((budget) => budget.id === 'budget-recurring-true')
+        ?.recurring,
+    ).toBe(true)
+    expect(
+      recurringMissingState.budgets.find((budget) => budget.id === 'budget-recurring-false')
+        ?.recurring,
+    ).toBe(false)
+    expect(
+      recurringMissingState.budgets.find((budget) => budget.id === 'budget-recurring-missing')
+        ?.recurring,
+    ).toBe(false)
+  })
+
   it('prevents category kind updates that break linked transactions', () => {
     const categoryId = findCategoryIdByName('Food')
     const category = initialFinanceState.categories.find(

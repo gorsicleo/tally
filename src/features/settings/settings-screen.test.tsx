@@ -117,6 +117,27 @@ describe('SettingsScreen direct flows', () => {
     expect(screen.getByText('Help & Feedback')).toBeInTheDocument()
   })
 
+  it('toggles overspending budgets visibility preference for home tab', async () => {
+    const setHideOverspendingBudgetsInHome = vi.fn()
+    const { user } = renderScreen(createState(), {
+      setHideOverspendingBudgetsInHome,
+    })
+
+    const rowElement = screen
+      .getByText('Hide overspending alerts')
+      .closest('.settings-list-row')
+
+    if (!(rowElement instanceof HTMLElement)) {
+      throw new Error('Expected overspending home toggle row to be rendered.')
+    }
+
+    await user.click(within(rowElement).getByRole('button', { name: 'On' }))
+    expect(setHideOverspendingBudgetsInHome).toHaveBeenCalledWith(true)
+
+    await user.click(within(rowElement).getByRole('button', { name: 'Off' }))
+    expect(setHideOverspendingBudgetsInHome).toHaveBeenCalledWith(false)
+  })
+
   it('opens and closes report bug dialog from settings', async () => {
     const { user } = renderScreen(createState())
 

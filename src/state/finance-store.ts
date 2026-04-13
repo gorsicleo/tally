@@ -42,6 +42,7 @@ export interface UpsertBudgetInput {
   categoryIds: string[]
   monthKey: string
   limit: number
+  recurring?: boolean
 }
 
 export interface TransactionRecurrenceInput {
@@ -91,6 +92,7 @@ export interface FinanceContextValue {
   removeBudget: (budgetId: string) => void
   setTheme: (theme: ThemeMode) => void
   setCurrency: (currency: string) => void
+  setHideOverspendingBudgetsInHome: (hidden: boolean) => void
   updateBackupSettings: (settings: Partial<BackupPreferences>) => void
   replaceState: (nextState: FinanceState) => Promise<void>
 }

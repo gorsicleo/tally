@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { formatCurrency, formatMonthLabel } from '../../domain/formatters'
 import {
+  getBudgetSignals,
   getCategoryTotals,
   getComparisonOverview,
   getMonthKey,
@@ -41,6 +42,13 @@ export function HomeScreen({
     () => getRecentTransactions(state, 6),
     [state],
   )
+  const budgetAlerts = useMemo(
+    () =>
+      getBudgetSignals(state, monthKey).filter(
+        (entry) => entry.tone === 'warning' || entry.tone === 'danger',
+      ),
+    [monthKey, state],
+  )
   const topCategory = useMemo(
     () => getCategoryTotals(state, monthKey, 'expense')[0] ?? null,
     [state, monthKey],
@@ -80,6 +88,67 @@ export function HomeScreen({
           </div>
         </div>
       </section>
+
+      {!state.settings.hideOverspendingBudgetsInHome && budgetAlerts.length > 0 ? (
+        <section className="panel budget-signal-list home-budget-alerts" aria-label="Overspent budgets">
+          <div className="section-heading-row budget-list-header">
+            <div>
+              <p className="eyebrow">Overspent budgets</p>
+              <p>Budgets close to overspending this month.</p>
+            </div>
+          </div>
+
+          {budgetAlerts.map((entry) => {
+            const statusLabel =
+              entry.remaining >= 0
+                ? `${formatCurrency(entry.remaining, currency)} left`
+                : `${formatCurrency(Math.abs(entry.remaining), currency)} over`
+            const detailLabel = `${formatCurrency(entry.spent, currency)} / ${formatCurrency(entry.limit, currency)}`
+            const categoriesLabel = entry.categories.map((category) => category.name).join(', ')
+
+            return (
+              <article
+                key={entry.budget.id}
+                className={`budget-signal-row ${entry.tone}`.trim()}
+                onClick={() => onNavigate('budgets')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onNavigate('budgets')
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="budget-signal-head">
+                  <div className="budget-signal-name">
+                    <strong>{entry.budget.name}</strong>
+                    <span className="budget-signal-detail">{categoriesLabel}</span>
+                  </div>
+
+                  <div className="budget-signal-summary">
+                    {entry.budget.recurring ? (
+                      <span className="budget-recurring-badge">Recurring</span>
+                    ) : null}
+                    <strong>{statusLabel}</strong>
+                  </div>
+                </div>
+
+                <div className="budget-signal-body">
+                  <span className="budget-signal-detail">{detailLabel}</span>
+
+                  <div className="progress-track budget-signal-track">
+                    <span
+                      className={entry.tone}
+                      style={{ width: `${entry.progress * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </section>
+      ) : null}
 
       <RecurringDueSection
         currency={currency}

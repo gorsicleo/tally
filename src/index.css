@@ -1559,26 +1559,46 @@ button.settings-category-row:hover {
   text-transform: uppercase;
 }
 
+.budget-category-hint {
+  margin: -2px 0 2px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
 .budget-category-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
 .budget-category-pill {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 11px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   background: rgba(255, 255, 255, 0.025);
   color: var(--text-secondary);
   cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease;
 }
 
-.budget-category-pill input {
-  accent-color: var(--accent);
+.budget-category-label {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 .budget-category-pill.active {
@@ -2406,8 +2426,7 @@ textarea {
 .budget-period-switch,
 .budget-signal-list,
 .budget-signal-body,
-.budget-sheet-stats,
-.budget-quick-values {
+.budget-sheet-stats {
   display: grid;
   gap: 12px;
 }
@@ -2465,6 +2484,38 @@ textarea {
   color: var(--text-muted);
 }
 
+.budget-recurring-control {
+  display: grid;
+  gap: 8px;
+}
+
+.budget-recurring-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.budget-recurring-switch button {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-secondary);
+  padding: 10px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.budget-recurring-switch button.active {
+  color: var(--text-primary);
+  border-color: rgba(20, 241, 217, 0.24);
+  background: linear-gradient(135deg, rgba(20, 241, 217, 0.16), rgba(93, 124, 255, 0.18));
+}
+
+.budget-recurring-hint {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
 .budget-allocation-preview {
   margin-top: -4px;
 }
@@ -2478,6 +2529,10 @@ textarea {
   gap: 12px;
   padding: 16px;
   overflow: visible;
+}
+
+.home-budget-alerts {
+  animation: surface-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .budget-signal-row {
@@ -2519,11 +2574,28 @@ textarea {
 }
 
 .budget-signal-summary {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
   flex-shrink: 0;
 }
 
 .budget-signal-summary strong {
   text-align: right;
+}
+
+.budget-recurring-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  padding: 3px 8px;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  font-weight: 800;
 }
 
 .budget-signal-body {
@@ -2561,10 +2633,6 @@ textarea {
 
 .budget-sheet-stats {
   margin-top: 4px;
-}
-
-.budget-quick-values {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .file-input-row input {
@@ -2794,6 +2862,10 @@ textarea {
 
   .budget-allocation-card {
     gap: 14px;
+  }
+
+  .budget-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .budget-signal-row {

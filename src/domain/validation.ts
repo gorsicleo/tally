@@ -27,6 +27,7 @@ const legacyBackupPreferenceDefaults = {
   backupReminderBaselineAt: null,
   changesSinceBackup: 0,
   lastReminderAt: null,
+  hideOverspendingBudgetsInHome: false,
 } as const
 
 interface ParsedBudgetCandidate {
@@ -37,6 +38,7 @@ interface ParsedBudgetCandidate {
   categoryIds: string[]
   monthKey: string
   limit: number
+  recurring: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -235,6 +237,7 @@ function parseBudgetCandidate(value: unknown): ParsedBudgetCandidate | null {
     categoryIds,
     monthKey: value.monthKey,
     limit: value.limit,
+    recurring: value.recurring === true,
   }
 }
 
@@ -264,6 +267,7 @@ function buildBudgetFromCandidate(
     categoryIds,
     monthKey: candidate.monthKey,
     limit: candidate.limit,
+    recurring: candidate.recurring,
   }
 }
 
@@ -278,7 +282,8 @@ function isBudget(value: unknown): value is Budget {
     value.categoryIds.length > 0 &&
     isString(value.monthKey) &&
     isNumber(value.limit) &&
-    value.limit > 0
+    value.limit > 0 &&
+    (value.recurring === undefined || typeof value.recurring === 'boolean')
   )
 }
 
@@ -360,7 +365,9 @@ function isAppSettings(value: unknown): value is AppSettings {
     (value.lastBackupAt === null || isString(value.lastBackupAt)) &&
     (value.backupReminderBaselineAt === null || isString(value.backupReminderBaselineAt)) &&
     isNonNegativeNumber(value.changesSinceBackup) &&
-    (value.lastReminderAt === null || isString(value.lastReminderAt))
+    (value.lastReminderAt === null || isString(value.lastReminderAt)) &&
+    (value.hideOverspendingBudgetsInHome === undefined ||
+      typeof value.hideOverspendingBudgetsInHome === 'boolean')
   )
 }
 
@@ -415,11 +422,18 @@ function parseAppSettings(
       : useLegacyBackupDefaults
         ? legacyBackupPreferenceDefaults.lastReminderAt
         : null
+  const hideOverspendingBudgetsInHome =
+    typeof value.hideOverspendingBudgetsInHome === 'boolean'
+      ? value.hideOverspendingBudgetsInHome
+      : useLegacyBackupDefaults
+        ? legacyBackupPreferenceDefaults.hideOverspendingBudgetsInHome
+        : null
 
   if (
     hasSeenPrivacyModal === null ||
     backupRemindersEnabled === null ||
-    changesSinceBackup === null
+    changesSinceBackup === null ||
+    hideOverspendingBudgetsInHome === null
   ) {
     return null
   }
@@ -433,6 +447,7 @@ function parseAppSettings(
     backupReminderBaselineAt,
     changesSinceBackup,
     lastReminderAt,
+    hideOverspendingBudgetsInHome,
   }
 }
 
