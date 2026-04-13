@@ -124,7 +124,7 @@ describe('SettingsScreen direct flows', () => {
     })
 
     const rowElement = screen
-      .getByText('Hide budgets on home tab')
+      .getByText('Hide overspending alerts')
       .closest('.settings-list-row')
 
     if (!(rowElement instanceof HTMLElement)) {

@@ -67,12 +67,12 @@ export function SettingsGeneralSection({
 
         <div className="settings-list-row settings-control-row">
           <div className="settings-row-copy">
-            <span className="settings-row-label">Hide budgets on home tab</span>
+            <span className="settings-row-label">Hide overspending alerts</span>
             <span className="settings-row-caption">
               {hideOverspendingBudgetsInHome ? 'On' : 'Off'}
             </span>
           </div>
-          <div className="settings-inline-switch" role="group" aria-label="Overspending budgets on home tab">
+          <div className="settings-inline-switch" role="group" aria-label="Hide overspending alerts">
             <button
               type="button"
               className={hideOverspendingBudgetsInHome ? 'active' : ''}

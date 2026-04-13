@@ -94,8 +94,8 @@ test('creates a budget from the budgets screen', async ({ page }) => {
 
   const dialog = page.getByRole('dialog', { name: 'Create budget' })
   await dialog.getByRole('textbox', { name: 'Budget name' }).fill('Groceries')
-  await dialog.getByRole('checkbox', { name: /Food/i }).check()
-  await dialog.getByRole('button', { name: '$100.00' }).click()
+  await dialog.getByRole('button', { name: /Food/i }).click()
+  await dialog.getByRole('spinbutton', { name: 'Monthly limit' }).fill('100')
   await dialog.getByRole('button', { name: 'Save budget' }).click()
 
   await expect(page.getByText('Groceries')).toBeVisible()

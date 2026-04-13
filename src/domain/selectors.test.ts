@@ -4,6 +4,7 @@ import type { Budget, FinanceState, Transaction, TransactionType } from './model
 import {
   getAvailableToBudgetForPeriod,
   getBudgetAllocationSummary,
+  getBudgetSignals,
   getRecentTransactions,
   getOverAllocatedAmountForPeriod,
   getTotalAllocatedBudgetLimitsForPeriod,
@@ -227,6 +228,39 @@ describe('budget allocation selectors', () => {
 
     expect(getTotalAllocatedBudgetLimitsForPeriod(state, '2026-04')).toBe(250)
     expect(getAvailableToBudgetForPeriod(state, '2026-04')).toBe(750)
+  })
+
+  it('counts recurring budget spending only from the queried month in signals', () => {
+    const state = createState({
+      transactions: [
+        createTransaction('expense', 80, '2026-03-10', {
+          id: 'txn-budget-march',
+          categoryId: 'cat-food',
+        }),
+        createTransaction('expense', 120, '2026-04-05', {
+          id: 'txn-budget-april',
+          categoryId: 'cat-food',
+        }),
+      ],
+      budgets: [
+        createBudget({
+          id: 'budget-recurring-food',
+          monthKey: '2026-03',
+          recurring: true,
+          categoryIds: ['cat-food'],
+          limit: 200,
+        }),
+      ],
+    })
+
+    const aprilSignals = getBudgetSignals(state, '2026-04')
+
+    expect(aprilSignals).toHaveLength(1)
+    expect(aprilSignals[0]).toMatchObject({
+      spent: 120,
+      remaining: 80,
+      tone: 'safe',
+    })
   })
 })
 

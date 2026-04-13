@@ -2426,7 +2426,6 @@ textarea {
 .budget-period-switch,
 .budget-signal-list,
 .budget-signal-body,
-.budget-sheet-stats,
 .budget-sheet-stats {
   display: grid;
   gap: 12px;
