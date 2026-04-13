@@ -209,6 +209,25 @@ describe('budget allocation selectors', () => {
       availableToBudgetForPeriod: 400,
     })
   })
+
+  it('includes recurring budget limits in later months after start month', () => {
+    const state = createState({
+      transactions: [
+        createTransaction('income', 1000, '2026-04-03'),
+      ],
+      budgets: [
+        createBudget({
+          id: 'budget-recurring',
+          monthKey: '2026-03',
+          recurring: true,
+          limit: 250,
+        }),
+      ],
+    })
+
+    expect(getTotalAllocatedBudgetLimitsForPeriod(state, '2026-04')).toBe(250)
+    expect(getAvailableToBudgetForPeriod(state, '2026-04')).toBe(750)
+  })
 })
 
 describe('getRecentTransactions', () => {

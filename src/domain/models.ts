@@ -42,6 +42,7 @@ export interface Budget extends BaseEntity {
   categoryIds: string[]
   monthKey: string
   limit: number
+  recurring?: boolean
 }
 
 export interface RecurringTemplate extends BaseEntity {
@@ -59,6 +60,7 @@ export interface RecurringTemplate extends BaseEntity {
 export interface AppSettings extends BackupPreferences {
   theme: ThemeMode
   currency: string
+  hideOverspendingBudgetsInHome?: boolean
 }
 
 export interface FinanceState {

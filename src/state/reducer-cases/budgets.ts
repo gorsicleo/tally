@@ -29,6 +29,7 @@ export function handleSetBudget(
     ...action.payload,
     name: normalizedName,
     categoryIds,
+    recurring: action.payload.recurring === true,
   }
 
   const nextBudgets = state.budgets.some(

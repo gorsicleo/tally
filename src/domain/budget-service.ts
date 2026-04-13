@@ -1,6 +1,35 @@
 import { isSystemCategory } from './categories'
 import type { Budget, Category, Transaction } from './models'
 
+export function doesBudgetApplyToMonth(
+  budget: Pick<Budget, 'monthKey'> & { recurring?: boolean },
+  monthKey: string,
+): boolean {
+  return budget.monthKey === monthKey || (budget.recurring === true && budget.monthKey <= monthKey)
+}
+
+export function doBudgetSchedulesOverlap(
+  left: Pick<Budget, 'monthKey'> & { recurring?: boolean },
+  right: Pick<Budget, 'monthKey'> & { recurring?: boolean },
+): boolean {
+  const leftRecurring = left.recurring === true
+  const rightRecurring = right.recurring === true
+
+  if (!leftRecurring && !rightRecurring) {
+    return left.monthKey === right.monthKey
+  }
+
+  if (leftRecurring && rightRecurring) {
+    return true
+  }
+
+  if (leftRecurring) {
+    return right.monthKey >= left.monthKey
+  }
+
+  return left.monthKey >= right.monthKey
+}
+
 export function normalizeBudgetCategoryIds(categoryIds: string[]): string[] {
   const seen = new Set<string>()
 

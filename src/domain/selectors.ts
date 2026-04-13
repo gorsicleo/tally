@@ -5,7 +5,7 @@ import type {
   Transaction,
   TransactionType,
 } from './models'
-import { computeBudgetSpending } from './budget-service'
+import { computeBudgetSpending, doesBudgetApplyToMonth } from './budget-service'
 import { compareLocalDateKeys, getTodayLocalDate } from '../utils/date'
 
 export interface OverviewTotals {
@@ -268,14 +268,17 @@ export function getBudgetSignals(
   )
 
   return state.budgets
-    .filter((budget) => budget.monthKey === monthKey && isBudgetActive(budget))
+    .filter((budget) => doesBudgetApplyToMonth(budget, monthKey) && isBudgetActive(budget))
     .map((budget) => {
       const categories = budget.categoryIds
         .map((categoryId) => categoriesById.get(categoryId) ?? null)
         .filter((category): category is Category =>
           Boolean(category && category.kind !== 'income'),
         )
-      const spent = computeBudgetSpending(budget, state.transactions)
+      const spent = computeBudgetSpending(
+        { categoryIds: budget.categoryIds, monthKey },
+        state.transactions,
+      )
       const limit = budget.limit
       const remaining = limit - spent
       const progress = limit > 0 ? Math.min(spent / limit, 1.25) : 0
@@ -329,7 +332,7 @@ export function getTotalAllocatedBudgetLimitsForPeriod(
   monthKey: string,
 ): number {
   return state.budgets.reduce((sum, budget) => {
-    if (budget.monthKey !== monthKey || !isBudgetActive(budget)) {
+    if (!doesBudgetApplyToMonth(budget, monthKey) || !isBudgetActive(budget)) {
       return sum
     }
 

@@ -44,6 +44,7 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState?.settings.backupReminderBaselineAt).toBeNull()
     expect(parsedState?.settings.changesSinceBackup).toBe(0)
     expect(parsedState?.settings.lastReminderAt).toBeNull()
+    expect(parsedState?.settings.hideOverspendingBudgetsInHome).toBe(false)
     expect(parsedState?.recurringTemplates).toEqual([])
     expect(parsedState?.transactions[0].recurringTemplateId).toBeNull()
     expect(parsedState?.transactions[0].recurringOccurrenceDate).toBeNull()
@@ -144,5 +145,58 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState).not.toBeNull()
     expect(parsedState?.transactions[0].categoryId).toBe(UNCATEGORIZED_CATEGORY_ID)
     expect(parsedState?.recurringTemplates[0].categoryId).toBe(UNCATEGORIZED_CATEGORY_ID)
+  })
+
+  it('defaults legacy budgets to non-recurring and preserves explicit recurring budgets', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [
+        {
+          id: 'budget-legacy',
+          name: 'Legacy budget',
+          categoryIds: ['cat-food'],
+          monthKey: '2026-03',
+          limit: 200,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+        {
+          id: 'budget-recurring',
+          name: 'Recurring budget',
+          categoryIds: ['cat-food'],
+          monthKey: '2026-03',
+          limit: 300,
+          recurring: true,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.budgets.find((entry) => entry.id === 'budget-legacy')?.recurring).toBe(
+      false,
+    )
+    expect(parsedState?.budgets.find((entry) => entry.id === 'budget-recurring')?.recurring).toBe(
+      true,
+    )
   })
 })

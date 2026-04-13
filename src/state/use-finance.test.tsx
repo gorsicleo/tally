@@ -34,6 +34,7 @@ describe('useFinance', () => {
           removeBudget: () => {},
           setTheme: () => {},
           setCurrency: () => {},
+          setHideOverspendingBudgetsInHome: () => {},
           updateBackupSettings: () => {},
           replaceState: async () => {},
         }}

@@ -94,5 +94,6 @@ export const initialFinanceState: FinanceState = {
     backupReminderBaselineAt: null,
     changesSinceBackup: 0,
     lastReminderAt: null,
+    hideOverspendingBudgetsInHome: false,
   },
 }
