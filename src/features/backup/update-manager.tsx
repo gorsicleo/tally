@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useServiceWorkerUpdate } from '../../pwa/use-service-worker-update'
 import {
-  MAX_CHANGELOG_ITEMS,
   getUpdateDisplayInfo,
   getUpdateSeverityDecision,
 } from '../../pwa/update-prompt-state'
@@ -26,7 +25,6 @@ export function UpdateManager({ onCreateBackup }: UpdateManagerProps) {
   const [hasCompletedRequiredBackup, setHasCompletedRequiredBackup] =
     useState(false)
   const [isBackingUp, setIsBackingUp] = useState(false)
-  const [isChangelogExpanded, setIsChangelogExpanded] = useState(false)
 
   const versionKey = availableVersionInfo?.version ?? 'no-update'
 
@@ -34,7 +32,6 @@ export function UpdateManager({ onCreateBackup }: UpdateManagerProps) {
     setStep('prompt')
     setHasCompletedRequiredBackup(false)
     setIsBackingUp(false)
-    setIsChangelogExpanded(false)
   }, [versionKey])
 
   const changelog = useMemo(() => {
@@ -47,18 +44,6 @@ export function UpdateManager({ onCreateBackup }: UpdateManagerProps) {
       .map((entry) => entry.trim())
       .filter((entry) => entry.length > 0)
   }, [availableVersionInfo])
-  const visibleChangelog = useMemo(
-    () =>
-      isChangelogExpanded
-        ? changelog
-        : changelog.slice(0, MAX_CHANGELOG_ITEMS),
-    [changelog, isChangelogExpanded],
-  )
-  const canExpandChangelog = useMemo(
-    () => changelog.length > MAX_CHANGELOG_ITEMS,
-    [changelog],
-  )
-
   if (!promptVisible || !availableVersionInfo) {
     return null
   }
@@ -201,27 +186,13 @@ export function UpdateManager({ onCreateBackup }: UpdateManagerProps) {
               <div
                 id="update-changelog-region"
                 className="update-changelog-scroll"
-                data-expanded={isChangelogExpanded}
               >
                 <ul className="update-changelog-list">
-                  {visibleChangelog.map((entry) => (
+                  {changelog.map((entry) => (
                     <li key={entry}>{entry}</li>
                   ))}
                 </ul>
               </div>
-              {canExpandChangelog ? (
-                <button
-                  type="button"
-                  className="text-button update-changelog-toggle"
-                  aria-controls="update-changelog-region"
-                  aria-expanded={isChangelogExpanded}
-                  onClick={() => {
-                    setIsChangelogExpanded((current) => !current)
-                  }}
-                >
-                  {isChangelogExpanded ? 'Show less' : 'Show more'}
-                </button>
-              ) : null}
             </div>
           ) : null}
           {severityDecision.requiresWarningStep && !needsReload ? (

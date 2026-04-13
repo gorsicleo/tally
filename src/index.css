@@ -489,20 +489,9 @@ textarea:focus-visible {
 }
 
 .update-changelog-scroll {
-  overflow: hidden;
-}
-
-.update-changelog-scroll[data-expanded='true'] {
   max-height: 180px;
   overflow-y: auto;
   padding-right: 6px;
-}
-
-.update-changelog-toggle {
-  justify-self: flex-start;
-  font-size: 0.86rem;
-  padding-block: 4px;
-  padding-inline: 0;
 }
 
 .backup-modal-actions {

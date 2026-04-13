@@ -70,28 +70,24 @@ describe('UpdateManager', () => {
     expect(screen.getByText('Improved charts')).toBeInTheDocument()
     expect(screen.getByText('Safer backups')).toBeInTheDocument()
     expect(screen.getByText('Update prompt')).toBeInTheDocument()
-    expect(screen.queryByText('Ignored')).not.toBeInTheDocument()
+    expect(screen.getByText('Ignored')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Update' }))
 
     expect(hookState.value.applyUpdate).toHaveBeenCalled()
   })
 
-  it('collapses long changelog entries and expands on demand', async () => {
-    const { user } = renderWithUser(
+  it('shows all changelog entries in an always-scrollable container', () => {
+    renderWithUser(
       <UpdateManager onCreateBackup={vi.fn(async () => true)} />,
     )
 
     expect(screen.getByText('Improved charts')).toBeInTheDocument()
     expect(screen.getByText('Safer backups')).toBeInTheDocument()
     expect(screen.getByText('Update prompt')).toBeInTheDocument()
-    expect(screen.queryByText('Ignored')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show more' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Show more' }))
-
     expect(screen.getByText('Ignored')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show less' })).not.toBeInTheDocument()
   })
 
   it('does not render when no update is available', () => {
