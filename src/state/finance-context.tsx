@@ -8,7 +8,10 @@ import {
   type PropsWithChildren,
 } from 'react'
 import { initialFinanceState } from '../domain/default-data'
-import { validateBudgetCategoryIds } from '../domain/budget-service'
+import {
+  doBudgetSchedulesOverlap,
+  validateBudgetCategoryIds,
+} from '../domain/budget-service'
 import {
   computeCategoryDeletionPlan,
   type CategoryDeletionPlanInput,
@@ -419,16 +422,23 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     const existingBudget = input.id
       ? stateRef.current.budgets.find((budget) => budget.id === input.id) ?? null
       : null
+    const recurring = input.recurring ?? existingBudget?.recurring ?? true
+    const candidateSchedule = {
+      monthKey: input.monthKey,
+      recurring,
+    }
     const normalizedName = trimmedName.toLowerCase()
     const duplicateName = stateRef.current.budgets.some(
       (budget) =>
         budget.id !== existingBudget?.id &&
-        budget.monthKey === input.monthKey &&
+        doBudgetSchedulesOverlap(budget, candidateSchedule) &&
         budget.name.trim().toLowerCase() === normalizedName,
     )
 
     if (duplicateName) {
-      return 'A budget with this name already exists for this month.'
+      return recurring
+        ? 'A budget with this name already exists for this schedule.'
+        : 'A budget with this name already exists for this month.'
     }
 
     const timestamp = new Date().toISOString()
@@ -441,6 +451,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
         categoryIds,
         monthKey: input.monthKey,
         limit: input.limit,
+        recurring,
         createdAt: existingBudget?.createdAt ?? timestamp,
         updatedAt: timestamp,
       },
@@ -461,6 +472,13 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     dispatch({
       type: 'update-settings',
       payload: { currency: currency.toUpperCase() },
+    })
+  }, [])
+
+  const setHideOverspendingBudgetsInHome = useCallback((hidden: boolean) => {
+    dispatch({
+      type: 'update-settings',
+      payload: { hideOverspendingBudgetsInHome: hidden },
     })
   }, [])
 
@@ -497,6 +515,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       removeBudget,
       setTheme,
       setCurrency,
+      setHideOverspendingBudgetsInHome,
       updateBackupSettings,
       replaceState,
     }),
@@ -519,6 +538,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       removeBudget,
       setTheme,
       setCurrency,
+      setHideOverspendingBudgetsInHome,
       updateBackupSettings,
       replaceState,
     ],

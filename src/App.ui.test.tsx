@@ -503,8 +503,8 @@ describe('App UI behavior', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Create budget' })
 
     await user.type(within(dialog).getByRole('textbox', { name: 'Budget name' }), 'Food budget')
-    await user.click(within(dialog).getByRole('checkbox', { name: /Food/i }))
-    await user.click(within(dialog).getByRole('button', { name: '$100.00' }))
+    await user.click(within(dialog).getByRole('button', { name: /Food/i }))
+    await user.type(within(dialog).getByRole('spinbutton', { name: 'Monthly limit' }), '100')
     await user.click(within(dialog).getByRole('button', { name: 'Save budget' }))
 
     expect(await screen.findByText('Food budget')).toBeInTheDocument()

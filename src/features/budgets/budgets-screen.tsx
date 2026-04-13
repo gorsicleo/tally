@@ -164,6 +164,9 @@ export function BudgetsScreen() {
                   </div>
 
                   <div className="budget-signal-summary">
+                    {entry.budget.recurring ? (
+                      <span className="budget-recurring-badge">Recurring</span>
+                    ) : null}
                     <strong>{statusLabel}</strong>
                   </div>
                 </div>
@@ -200,8 +203,11 @@ export function BudgetsScreen() {
               id: input.id,
               name: input.name,
               categoryIds: input.categoryIds,
-              monthKey,
+              monthKey: input.id && selectedBudget?.id === input.id
+                ? selectedBudget.monthKey
+                : monthKey,
               limit: input.limit,
+              recurring: input.recurring,
             })
           }
           onRemove={(budgetId) => {

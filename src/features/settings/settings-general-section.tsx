@@ -4,16 +4,20 @@ interface SettingsGeneralSectionProps {
   currency: string
   currencyOptions: string[]
   theme: ThemeMode
+  hideOverspendingBudgetsInHome: boolean
   onCurrencyChange: (currency: string) => void
   onThemeChange: (theme: ThemeMode) => void
+  onHideOverspendingBudgetsInHomeChange: (hidden: boolean) => void
 }
 
 export function SettingsGeneralSection({
   currency,
   currencyOptions,
   theme,
+  hideOverspendingBudgetsInHome,
   onCurrencyChange,
   onThemeChange,
+  onHideOverspendingBudgetsInHomeChange,
 }: SettingsGeneralSectionProps) {
   return (
     <div className="settings-group">
@@ -57,6 +61,31 @@ export function SettingsGeneralSection({
               onClick={() => onThemeChange('dark')}
             >
               Dark
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-list-row settings-control-row">
+          <div className="settings-row-copy">
+            <span className="settings-row-label">Hide overspending alerts</span>
+            <span className="settings-row-caption">
+              {hideOverspendingBudgetsInHome ? 'On' : 'Off'}
+            </span>
+          </div>
+          <div className="settings-inline-switch" role="group" aria-label="Hide overspending alerts">
+            <button
+              type="button"
+              className={hideOverspendingBudgetsInHome ? 'active' : ''}
+              onClick={() => onHideOverspendingBudgetsInHomeChange(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={!hideOverspendingBudgetsInHome ? 'active' : ''}
+              onClick={() => onHideOverspendingBudgetsInHomeChange(false)}
+            >
+              Off
             </button>
           </div>
         </div>

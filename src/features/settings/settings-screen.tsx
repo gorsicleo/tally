@@ -331,6 +331,7 @@ export function SettingsScreen({
     deleteCategory,
     setTheme,
     setCurrency,
+    setHideOverspendingBudgetsInHome,
     updateBackupSettings,
     replaceState,
   } = useFinance()
@@ -707,8 +708,14 @@ export function SettingsScreen({
             currency={state.settings.currency}
             currencyOptions={currencyOptions}
             theme={state.settings.theme}
+            hideOverspendingBudgetsInHome={
+              state.settings.hideOverspendingBudgetsInHome ?? false
+            }
             onCurrencyChange={(currency) => setCurrency(currency)}
             onThemeChange={(theme) => setTheme(theme)}
+            onHideOverspendingBudgetsInHomeChange={(hidden) => {
+              setHideOverspendingBudgetsInHome(hidden)
+            }}
           />
 
           <SettingsBackupSection
@@ -763,7 +770,7 @@ export function SettingsScreen({
                 onClick={() => setView('recurring')}
               >
                 <div className="settings-row-copy">
-                  <span className="settings-row-label">Manage recurring</span>
+                  <span className="settings-row-label">Manage recurring transactions</span>
                   <span className="settings-row-caption">
                     {activeRecurringTemplates.length} active
                   </span>

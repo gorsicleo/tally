@@ -20,12 +20,41 @@ interface BudgetEditorSheetProps {
     name: string
     categoryIds: string[]
     limit: number
+    recurring: boolean
   }) => string | null
   onRemove: (budgetId: string) => void
 }
 
 const SHEET_CLOSE_MS = 280
-const quickBudgetValues = [100, 200, 500]
+
+const BUDGET_CATEGORY_LABEL_MAX = 34
+
+function formatBudgetCategoryLabel(name: string): string {
+  if (name.length <= BUDGET_CATEGORY_LABEL_MAX) {
+    return name
+  }
+
+  const parts = name
+    .split('/')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
+
+  if (parts.length >= 2) {
+    const start = parts[0]
+    const end = parts[parts.length - 1]
+    const separator = ' / ... / '
+
+    if (start.length + separator.length + end.length <= BUDGET_CATEGORY_LABEL_MAX) {
+      return `${start}${separator}${end}`
+    }
+  }
+
+  const visibleChars = BUDGET_CATEGORY_LABEL_MAX - 1
+  const leadingChars = Math.ceil(visibleChars / 2)
+  const trailingChars = Math.floor(visibleChars / 2)
+
+  return `${name.slice(0, leadingChars)}…${name.slice(-trailingChars)}`
+}
 
 export function BudgetEditorSheet({
   mode,
@@ -41,6 +70,7 @@ export function BudgetEditorSheet({
 }: BudgetEditorSheetProps) {
   const [name, setName] = useState(budget?.name ?? '')
   const [limit, setLimit] = useState(budget ? String(budget.limit) : '')
+  const [recurring, setRecurring] = useState(budget?.recurring ?? true)
   const [categoryIds, setCategoryIds] = useState<string[]>(budget?.categoryIds ?? [])
   const [error, setError] = useState<string | null>(null)
   const [state, setState] = useState<'opening' | 'open' | 'closing'>('opening')
@@ -116,6 +146,7 @@ export function BudgetEditorSheet({
       name: trimmedName,
       categoryIds,
       limit: numericLimit,
+      recurring,
     })
 
     if (nextError) {
@@ -182,7 +213,7 @@ export function BudgetEditorSheet({
             className="icon-button"
             onClick={() => requestClose()}
           >
-            Close
+            {mode === 'edit' ? 'Close' : 'Discard'}
           </button>
         </div>
 
@@ -231,58 +262,77 @@ export function BudgetEditorSheet({
             />
           </label>
 
+          <div className="budget-recurring-control">
+            <span className="sheet-inline-label">Cadence</span>
+            <div className="budget-recurring-switch" role="group" aria-label="Budget cadence">
+              <button
+                type="button"
+                className={`${recurring ? 'active' : ''}`.trim()}
+                aria-pressed={recurring}
+                onClick={() => setRecurring(true)}
+              >
+                Recurring
+              </button>
+              <button
+                type="button"
+                className={`${!recurring ? 'active' : ''}`.trim()}
+                aria-pressed={!recurring}
+                onClick={() => setRecurring(false)}
+              >
+                This month only
+              </button>
+            </div>
+            <p className="budget-recurring-hint">
+              Recurring budgets apply every month.
+            </p>
+          </div>
+
           {previewLabel ? (
             <p className="support-copy budget-allocation-preview">{previewLabel}</p>
           ) : null}
 
           <fieldset className="budget-category-fieldset">
             <legend>Categories</legend>
+            <p className="budget-category-hint" id="budget-category-hint">
+              Tap to include one or more categories in this budget.
+            </p>
 
             {categories.length === 0 ? (
               <p className="support-copy">No expense categories are available.</p>
             ) : (
-              <div className="budget-category-grid" role="group" aria-label="Budget categories">
+              <div
+                className="budget-category-grid"
+                role="group"
+                aria-label="Budget categories"
+                aria-describedby="budget-category-hint"
+              >
                 {categories.map((category) => {
                   const active = categoryIds.includes(category.id)
+                  const displayName = formatBudgetCategoryLabel(category.name)
 
                   return (
-                    <label
+                    <button
                       key={category.id}
+                      type="button"
                       className={`budget-category-pill ${active ? 'active' : ''}`.trim()}
+                      aria-pressed={active}
+                      aria-label={category.name}
+                      onClick={() => toggleCategory(category.id)}
                     >
-                      <input
-                        type="checkbox"
-                        checked={active}
-                        onChange={() => toggleCategory(category.id)}
-                      />
                       <span
                         className="chip-dot"
                         aria-hidden="true"
                         style={{ backgroundColor: category.color }}
                       />
-                      <span>{category.name}</span>
-                    </label>
+                      <span className="budget-category-label" title={category.name}>
+                        {displayName}
+                      </span>
+                    </button>
                   )
                 })}
               </div>
             )}
           </fieldset>
-
-          <div className="budget-quick-values" role="group" aria-label="Quick budget values">
-            {quickBudgetValues.map((value) => (
-              <button
-                key={value}
-                type="button"
-                className="ghost-button compact"
-                onClick={() => {
-                  setLimit(String(value))
-                  setError(null)
-                }}
-              >
-                {formatCurrency(value, currency)}
-              </button>
-            ))}
-          </div>
 
           {error ? <p className="inline-error">{error}</p> : null}
 

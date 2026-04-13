@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { initialFinanceState } from './default-data'
 import {
   computeBudgetSpending,
+  doBudgetSchedulesOverlap,
+  doesBudgetApplyToMonth,
   getBudgetTargetableCategoryIds,
   isBudgetInputValid,
   normalizeBudgetCategoryIds,
@@ -104,5 +106,41 @@ describe('budget-service helpers', () => {
     )
 
     expect(spent).toBe(20)
+  })
+
+  it('treats recurring budgets as active from their start month onward', () => {
+    expect(
+      doesBudgetApplyToMonth(
+        {
+          monthKey: '2026-03',
+          recurring: true,
+        },
+        '2026-05',
+      ),
+    ).toBe(true)
+    expect(
+      doesBudgetApplyToMonth(
+        {
+          monthKey: '2026-03',
+          recurring: false,
+        },
+        '2026-05',
+      ),
+    ).toBe(false)
+  })
+
+  it('detects schedule overlap between recurring and one-time budgets', () => {
+    expect(
+      doBudgetSchedulesOverlap(
+        { monthKey: '2026-03', recurring: true },
+        { monthKey: '2026-07', recurring: false },
+      ),
+    ).toBe(true)
+    expect(
+      doBudgetSchedulesOverlap(
+        { monthKey: '2026-06', recurring: false },
+        { monthKey: '2026-04', recurring: false },
+      ),
+    ).toBe(false)
   })
 })

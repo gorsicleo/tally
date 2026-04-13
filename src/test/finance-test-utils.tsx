@@ -26,6 +26,7 @@ export function createFinanceContextValue(
     removeBudget: () => {},
     setTheme: () => {},
     setCurrency: () => {},
+    setHideOverspendingBudgetsInHome: () => {},
     updateBackupSettings: () => {},
     replaceState: async () => {},
     ...overrides,
