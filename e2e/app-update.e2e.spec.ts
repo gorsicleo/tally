@@ -131,3 +131,50 @@ test('recommended-backup updates warn first but can proceed without backup', asy
     return state?.workerMessages?.length ?? 0
   }).toBe(1)
 })
+
+test('long changelog stays scrollable and keeps update actions visible on mobile', async ({ page }) => {
+  await freezeTime(page)
+  await seedAppState(page, createSeedState({ withTransactions: false }))
+  await page.setViewportSize({ width: 390, height: 844 })
+
+  await page.goto('/')
+  await waitForAppReady(page)
+  await resetUpdateTestHooks(page)
+
+  const longChangelog = Array.from({ length: 40 }, (_, index) => `Changelog item ${index + 1}`)
+
+  await simulateUpdateAvailable(page, {
+    availableVersionInfo: {
+      version: '1.6.0',
+      changelog: longChangelog,
+      severity: 'minor',
+    },
+    withMockWaitingWorker: true,
+  })
+
+  const dialog = page.getByRole('dialog', { name: 'Update available' })
+  await expect(dialog).toBeVisible()
+
+  const changelogRegion = page.locator('#update-changelog-region')
+  await expect(changelogRegion).toBeVisible()
+
+  const hasInternalScroll = await changelogRegion.evaluate((node) => {
+    return node.scrollHeight > node.clientHeight
+  })
+  expect(hasInternalScroll).toBe(true)
+
+  const updateButton = page.getByRole('button', { name: 'Update' })
+  const laterButton = page.getByRole('button', { name: 'Later' })
+
+  await expect(updateButton).toBeVisible()
+  await expect(laterButton).toBeVisible()
+  await expect(updateButton).toBeInViewport()
+  await expect(laterButton).toBeInViewport()
+
+  await updateButton.click()
+
+  await expect.poll(async () => {
+    const state = await getUpdateTestState(page)
+    return state?.workerMessages?.length ?? 0
+  }).toBe(1)
+})
