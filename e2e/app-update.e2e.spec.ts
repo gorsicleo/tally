@@ -168,15 +168,8 @@ test('long changelog stays scrollable and keeps update actions visible on mobile
 
   await expect(updateButton).toBeVisible()
   await expect(laterButton).toBeVisible()
-
-  const viewportHeight = page.viewportSize()?.height ?? 0
-  const updateBox = await updateButton.boundingBox()
-  const laterBox = await laterButton.boundingBox()
-
-  expect(updateBox).not.toBeNull()
-  expect(laterBox).not.toBeNull()
-  expect((updateBox?.y ?? 0) + (updateBox?.height ?? 0)).toBeLessThanOrEqual(viewportHeight)
-  expect((laterBox?.y ?? 0) + (laterBox?.height ?? 0)).toBeLessThanOrEqual(viewportHeight)
+  await expect(updateButton).toBeInViewport()
+  await expect(laterButton).toBeInViewport()
 
   await updateButton.click()
 
