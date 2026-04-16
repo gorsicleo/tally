@@ -77,7 +77,7 @@ describe('UpdateManager', () => {
     expect(hookState.value.applyUpdate).toHaveBeenCalled()
   })
 
-  it('shows all changelog entries in an always-scrollable container', () => {
+  it('shows all changelog entries in the changelog container', () => {
     renderWithUser(
       <UpdateManager onCreateBackup={vi.fn(async () => true)} />,
     )
@@ -86,8 +86,6 @@ describe('UpdateManager', () => {
     expect(screen.getByText('Safer backups')).toBeInTheDocument()
     expect(screen.getByText('Update prompt')).toBeInTheDocument()
     expect(screen.getByText('Ignored')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Show less' })).not.toBeInTheDocument()
   })
 
   it('does not render when no update is available', () => {

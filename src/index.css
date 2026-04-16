@@ -427,6 +427,12 @@ textarea:focus-visible {
 
 .update-modal-panel {
   gap: 16px;
+  max-height: calc(100svh - 36px);
+  overflow: hidden;
+}
+
+.update-modal-panel .backup-modal-copy {
+  min-height: 0;
 }
 
 .report-bug-modal-panel {
@@ -489,9 +495,13 @@ textarea:focus-visible {
 }
 
 .update-changelog-scroll {
-  max-height: 180px;
+  max-height: min(220px, 30svh);
   overflow-y: auto;
-  padding-right: 6px;
+  overscroll-behavior: contain;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px 12px;
 }
 
 .backup-modal-actions {

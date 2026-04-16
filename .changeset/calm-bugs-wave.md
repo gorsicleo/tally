@@ -2,4 +2,4 @@
 "tally": patch
 ---
 
-[severity:minor] Adds a Help and Feedback section in Settings with GitHub bug reporting, app info copy, and supporting visual and browser-flow coverage.
+[severity:minor] Fixes the update prompt changelog layout so release notes always render inside a bordered, rounded, scrollable container, preventing long content from pushing action buttons off-screen on small mobile/PWA viewports.
