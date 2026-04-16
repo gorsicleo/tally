@@ -428,11 +428,14 @@ textarea:focus-visible {
 .update-modal-panel {
   gap: 16px;
   max-height: calc(100svh - 36px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
 
 .update-modal-panel .backup-modal-copy {
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .report-bug-modal-panel {

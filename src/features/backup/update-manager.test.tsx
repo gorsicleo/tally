@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { UpdateManager } from './update-manager'
 import { renderWithUser } from '../../test/render-utils'
 import type { AppVersionInfo } from '../../pwa/app-version'
@@ -77,15 +77,20 @@ describe('UpdateManager', () => {
     expect(hookState.value.applyUpdate).toHaveBeenCalled()
   })
 
-  it('shows all changelog entries in the changelog container', () => {
+  it('shows all changelog entries inside the dedicated changelog scroll region', () => {
     renderWithUser(
       <UpdateManager onCreateBackup={vi.fn(async () => true)} />,
     )
 
-    expect(screen.getByText('Improved charts')).toBeInTheDocument()
-    expect(screen.getByText('Safer backups')).toBeInTheDocument()
-    expect(screen.getByText('Update prompt')).toBeInTheDocument()
-    expect(screen.getByText('Ignored')).toBeInTheDocument()
+    const changelogRegion = document.getElementById('update-changelog-region')
+    expect(changelogRegion).toBeInTheDocument()
+    expect(changelogRegion).toHaveClass('update-changelog-scroll')
+
+    const changelogList = within(changelogRegion as HTMLElement).getByRole('list')
+    expect(within(changelogList).getByText('Improved charts')).toBeInTheDocument()
+    expect(within(changelogList).getByText('Safer backups')).toBeInTheDocument()
+    expect(within(changelogList).getByText('Update prompt')).toBeInTheDocument()
+    expect(within(changelogList).getByText('Ignored')).toBeInTheDocument()
   })
 
   it('does not render when no update is available', () => {
