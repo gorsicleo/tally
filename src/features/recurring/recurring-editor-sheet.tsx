@@ -48,11 +48,6 @@ export function RecurringEditorSheet({
   const closeTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!template) {
-      onClose()
-      return
-    }
-
     const frame = window.requestAnimationFrame(() => {
       setSheetState('open')
     })
@@ -63,6 +58,12 @@ export function RecurringEditorSheet({
       if (closeTimeoutRef.current !== null) {
         window.clearTimeout(closeTimeoutRef.current)
       }
+    }
+  }, [templateId])
+
+  useEffect(() => {
+    if (!template) {
+      onClose()
     }
   }, [onClose, template])
 
@@ -153,8 +154,9 @@ export function RecurringEditorSheet({
       return
     }
 
+    stopRecurringTemplate(template.id)
+
     requestClose(() => {
-      stopRecurringTemplate(template.id)
       onShowToast('Recurring stopped.')
     })
   }
@@ -181,6 +183,16 @@ export function RecurringEditorSheet({
             <p className="eyebrow">Recurring</p>
             <h3 id="recurring-sheet-title">Edit future recurring transactions</h3>
           </div>
+
+          <button
+            type="button"
+            className="icon-button sheet-close-button"
+            aria-label="Close recurring editor"
+            title="Close"
+            onClick={() => requestClose()}
+          >
+            <span aria-hidden="true">&#215;</span>
+          </button>
         </div>
 
         <form className="field-grid transaction-sheet-form" onSubmit={handleSubmit}>
