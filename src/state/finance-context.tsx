@@ -210,6 +210,18 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     }
   }, [isLoaded])
 
+  const registerFailedUnlockAttempt = useCallback(() => {
+    appLockFailedAttemptsRef.current += 1
+
+    if (appLockFailedAttemptsRef.current >= APP_LOCK_FAILURES_BEFORE_COOLDOWN) {
+      appLockFailedAttemptsRef.current = 0
+      setAppLockCooldownUntil(Date.now() + APP_LOCK_COOLDOWN_AFTER_FAILURES_MS)
+      return 'Too many incorrect attempts. Try again in a moment.'
+    }
+
+    return null
+  }, [])
+
   const verifyStoredPin = useCallback(async (pin: string) => {
     const verifier = stateRef.current.settings.appLockPinVerifier
 
@@ -229,16 +241,14 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       return null
     }
 
-    appLockFailedAttemptsRef.current += 1
+    const failedAttemptMessage = registerFailedUnlockAttempt()
 
-    if (appLockFailedAttemptsRef.current >= APP_LOCK_FAILURES_BEFORE_COOLDOWN) {
-      appLockFailedAttemptsRef.current = 0
-      setAppLockCooldownUntil(Date.now() + APP_LOCK_COOLDOWN_AFTER_FAILURES_MS)
-      return 'Too many incorrect attempts. Try again in a moment.'
+    if (failedAttemptMessage) {
+      return failedAttemptMessage
     }
 
     return 'Incorrect PIN.'
-  }, [appLockCooldownUntil])
+  }, [appLockCooldownUntil, registerFailedUnlockAttempt])
 
   const addCategory = useCallback((input: AddCategoryInput) => {
     const timestamp = new Date().toISOString()
@@ -818,9 +828,19 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       return null
     }
 
+    if (appLockCooldownUntil !== null && Date.now() < appLockCooldownUntil) {
+      return 'Too many incorrect attempts. Try again in a moment.'
+    }
+
     const result = await verifyAndConsumeRecoveryCode(code, stateRef.current.settings.recoveryCodeSet)
 
     if (!result.ok || !result.nextSet) {
+      const failedAttemptMessage = registerFailedUnlockAttempt()
+
+      if (failedAttemptMessage) {
+        return failedAttemptMessage
+      }
+
       return result.message ?? 'Recovery code is invalid or already used.'
     }
 
@@ -836,7 +856,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     })
 
     return null
-  }, [])
+  }, [appLockCooldownUntil, registerFailedUnlockAttempt])
 
   const setHideOverspendingBudgetsInHome = useCallback((hidden: boolean) => {
     dispatch({
