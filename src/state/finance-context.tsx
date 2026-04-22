@@ -61,20 +61,16 @@ import {
 export function FinanceProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(financeReducer, initialFinanceState)
   const [isLoaded, setIsLoaded] = useState(false)
-  const [isAppUnlocked, setIsAppUnlocked] = useState(false)
+  const [hasSessionUnlock, setHasSessionUnlock] = useState(false)
   const [appLockCooldownUntil, setAppLockCooldownUntil] = useState<number | null>(null)
-  const [isDeviceAuthSupported, setIsDeviceAuthSupported] = useState(
-    () => isDeviceAuthenticationSupported(),
-  )
+  const isDeviceAuthSupported = isDeviceAuthenticationSupported()
   const [sensitiveDataRevealedForSession, setSensitiveDataRevealedForSession] =
     useState(false)
   const stateRef = useRef(state)
   const appLockFailedAttemptsRef = useRef(0)
   const backgroundedAtRef = useRef<number | null>(null)
 
-  useEffect(() => {
-    setIsDeviceAuthSupported(isDeviceAuthenticationSupported())
-  }, [])
+  const isAppUnlocked = !shouldRequireAppLock(state.settings) || hasSessionUnlock
 
   useEffect(() => {
     stateRef.current = state
@@ -109,18 +105,6 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       // Routine persistence failures are surfaced on explicit restore actions.
     })
   }, [isLoaded, state])
-
-  useEffect(() => {
-    if (!isLoaded) {
-      return
-    }
-
-    if (!shouldRequireAppLock(state.settings)) {
-      setIsAppUnlocked(true)
-      setAppLockCooldownUntil(null)
-      appLockFailedAttemptsRef.current = 0
-    }
-  }, [isLoaded, state.settings])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -192,7 +176,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
 
       if (wasBackgroundedLongEnough) {
         setSensitiveDataRevealedForSession(false)
-        setIsAppUnlocked(false)
+        setHasSessionUnlock(false)
       }
     }
 
@@ -634,7 +618,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     if (!enabled) {
       setAppLockCooldownUntil(null)
       appLockFailedAttemptsRef.current = 0
-      setIsAppUnlocked(true)
+      setHasSessionUnlock(false)
     }
   }, [])
 
@@ -648,7 +632,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     const verifier = await createAppLockPinVerifier(pin)
     setAppLockCooldownUntil(null)
     appLockFailedAttemptsRef.current = 0
-    setIsAppUnlocked(true)
+    setHasSessionUnlock(true)
     dispatch({
       type: 'update-settings',
       payload: {
@@ -700,7 +684,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     appLockFailedAttemptsRef.current = 0
     backgroundedAtRef.current = null
     setSensitiveDataRevealedForSession(false)
-    setIsAppUnlocked(true)
+    setHasSessionUnlock(false)
     dispatch({
       type: 'update-settings',
       payload: {
@@ -716,7 +700,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
 
   const unlockApp = useCallback(async (pin: string) => {
     if (!shouldRequireAppLock(stateRef.current.settings)) {
-      setIsAppUnlocked(true)
+      setHasSessionUnlock(false)
       return null
     }
 
@@ -727,7 +711,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     }
 
     backgroundedAtRef.current = null
-    setIsAppUnlocked(true)
+    setHasSessionUnlock(true)
     return null
   }, [verifyStoredPin])
 
@@ -771,7 +755,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
 
   const unlockAppWithDeviceAuthentication = useCallback(async () => {
     if (!shouldRequireAppLock(stateRef.current.settings)) {
-      setIsAppUnlocked(true)
+      setHasSessionUnlock(false)
       return null
     }
 
@@ -786,7 +770,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     appLockFailedAttemptsRef.current = 0
     setAppLockCooldownUntil(null)
     backgroundedAtRef.current = null
-    setIsAppUnlocked(true)
+    setHasSessionUnlock(true)
 
     return null
   }, [])
@@ -830,7 +814,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
 
   const unlockAppWithRecoveryCode = useCallback(async (code: string) => {
     if (!shouldRequireAppLock(stateRef.current.settings)) {
-      setIsAppUnlocked(true)
+      setHasSessionUnlock(false)
       return null
     }
 
@@ -843,7 +827,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     appLockFailedAttemptsRef.current = 0
     setAppLockCooldownUntil(null)
     backgroundedAtRef.current = null
-    setIsAppUnlocked(true)
+    setHasSessionUnlock(true)
     dispatch({
       type: 'update-settings',
       payload: {
@@ -903,7 +887,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     setAppLockCooldownUntil(null)
     appLockFailedAttemptsRef.current = 0
     backgroundedAtRef.current = null
-    setIsAppUnlocked(!shouldRequireAppLock(nextState.settings))
+    setHasSessionUnlock(false)
     dispatch({ type: 'replace-state', payload: nextState })
   }, [])
 

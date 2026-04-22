@@ -991,7 +991,7 @@ describe('App UI behavior', () => {
   }, 15000)
 
   it('applies a short cooldown after repeated incorrect PIN attempts', async () => {
-    let mockedNow = new Date('2026-04-22T12:00:00.000Z').getTime()
+    const mockedNow = new Date('2026-04-22T12:00:00.000Z').getTime()
     const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockedNow)
 
     storageState.loadedState = createLoadedState({
