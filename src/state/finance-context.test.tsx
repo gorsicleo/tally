@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialFinanceState } from '../domain/default-data'
 import type { FinanceState } from '../domain/models'
+import { createAppLockPinVerifier } from '../features/privacy/app-lock'
+import { createRecoveryCodeSet } from '../features/privacy/recovery-codes'
 import { FinanceProvider } from './finance-context'
 import { useFinance } from './use-finance'
 
@@ -101,6 +104,32 @@ function FinanceProbe({ replacementState }: { replacementState: FinanceState }) 
         }}
       >
         Replace state
+      </button>
+    </>
+  )
+}
+
+function RecoveryUnlockProbe() {
+  const finance = useFinance()
+  const [message, setMessage] = useState('')
+
+  return (
+    <>
+      <div data-testid="loaded">{String(finance.isLoaded)}</div>
+      <div data-testid="unlock-message">{message}</div>
+      <div data-testid="cooldown-status">
+        {finance.appLockCooldownUntil === null ? 'none' : 'set'}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          void finance.unlockAppWithRecoveryCode('bad').then((result) => {
+            setMessage(result ?? 'ok')
+          })
+        }}
+      >
+        Attempt bad recovery code
       </button>
     </>
   )
@@ -236,6 +265,59 @@ describe('FinanceProvider integration', () => {
         String(initialFinanceState.categories.length + 1),
       )
       expect(storageMocks.saveFinanceState).toHaveBeenCalled()
+    })
+  })
+
+  it('applies cooldown after repeated failed recovery code attempts', async () => {
+    const pinVerifier = await createAppLockPinVerifier('1234')
+    const recovery = await createRecoveryCodeSet()
+    const lockedState = createState({
+      settings: {
+        ...initialFinanceState.settings,
+        hasSeenPrivacyModal: true,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: pinVerifier,
+        recoveryCodeSet: recovery.codeSet,
+      },
+    })
+    storageMocks.loadFinanceState.mockResolvedValue(lockedState)
+    const user = userEvent.setup()
+
+    render(
+      <FinanceProvider>
+        <RecoveryUnlockProbe />
+      </FinanceProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loaded')).toHaveTextContent('true')
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Attempt bad recovery code' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('unlock-message')).toHaveTextContent('Recovery code is invalid.')
+      expect(screen.getByTestId('cooldown-status')).toHaveTextContent('none')
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Attempt bad recovery code' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('unlock-message')).toHaveTextContent('Recovery code is invalid.')
+      expect(screen.getByTestId('cooldown-status')).toHaveTextContent('none')
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Attempt bad recovery code' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('unlock-message')).toHaveTextContent(
+        'Too many incorrect attempts. Try again in a moment.',
+      )
+      expect(screen.getByTestId('cooldown-status')).toHaveTextContent('set')
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Attempt bad recovery code' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('unlock-message')).toHaveTextContent(
+        'Too many incorrect attempts. Try again in a moment.',
+      )
     })
   })
 })

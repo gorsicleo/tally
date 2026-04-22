@@ -7,12 +7,17 @@ import {
   validateBudgetCategoryIds,
 } from './budget-service'
 import type {
+  AppLockPinVerifier,
   AppSettings,
   Budget,
   Category,
   CategoryKind,
   CategorySystem,
+  DeviceAuthCredential,
+  DeviceAuthTransport,
   FinanceState,
+  RecoveryCodeSet,
+  RecoveryCodeVerifier,
   RecurringTemplate,
   RecurringFrequency,
   ThemeMode,
@@ -28,7 +33,18 @@ const legacyBackupPreferenceDefaults = {
   changesSinceBackup: 0,
   lastReminderAt: null,
   hideOverspendingBudgetsInHome: false,
+  hideSensitiveData: false,
+  lockAppOnLaunch: false,
+  appLockPinVerifier: null,
+  deviceAuthCredential: null,
+  recoveryCodeSet: null,
 } as const
+
+const APP_LOCK_PIN_VERIFIER_ITERATIONS = 200_000
+const APP_LOCK_PIN_SALT_HEX_LENGTH = 32
+const APP_LOCK_PIN_VERIFIER_HEX_LENGTH = 64
+const RECOVERY_CODE_SALT_HEX_LENGTH = 32
+const RECOVERY_CODE_VERIFIER_HEX_LENGTH = 64
 
 interface ParsedBudgetCandidate {
   id: string
@@ -59,6 +75,48 @@ function isNonNegativeNumber(value: unknown): value is number {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
+}
+
+function isHexString(value: unknown): value is string {
+  return isString(value) && /^[0-9a-f]+$/i.test(value) && value.length > 0
+}
+
+function isHexStringWithLength(value: unknown, expectedLength: number): value is string {
+  return isHexString(value) && value.length === expectedLength
+}
+
+function isBase64UrlString(value: unknown): value is string {
+  return isString(value) && /^[A-Za-z0-9_-]+$/.test(value) && value.length > 0
+}
+
+function parseDeviceAuthTransport(value: unknown): DeviceAuthTransport | null {
+  return value === 'usb' ||
+    value === 'nfc' ||
+    value === 'ble' ||
+    value === 'internal' ||
+    value === 'hybrid'
+    ? value
+    : null
+}
+
+function parseRecoveryCodeVerifier(value: unknown): RecoveryCodeVerifier | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (
+    !isString(value.id) ||
+    !isHexStringWithLength(value.verifierHex, RECOVERY_CODE_VERIFIER_HEX_LENGTH) ||
+    !(value.usedAt === null || isString(value.usedAt))
+  ) {
+    return null
+  }
+
+  return {
+    id: value.id,
+    verifierHex: value.verifierHex,
+    usedAt: value.usedAt,
+  }
 }
 
 function isTransactionType(value: unknown): value is TransactionType {
@@ -351,6 +409,104 @@ function parseRecurringTemplates(value: unknown): RecurringTemplate[] | null {
   return parsedTemplates
 }
 
+function parseAppLockPinVerifier(value: unknown): AppLockPinVerifier | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (
+    value.version !== 1 ||
+    value.algorithm !== 'PBKDF2' ||
+    value.hash !== 'SHA-256' ||
+    !isNonNegativeNumber(value.iterations) ||
+    value.iterations !== APP_LOCK_PIN_VERIFIER_ITERATIONS ||
+    !isHexStringWithLength(value.saltHex, APP_LOCK_PIN_SALT_HEX_LENGTH) ||
+    !isHexStringWithLength(value.verifierHex, APP_LOCK_PIN_VERIFIER_HEX_LENGTH)
+  ) {
+    return null
+  }
+
+  return {
+    version: 1,
+    algorithm: 'PBKDF2',
+    hash: 'SHA-256',
+    iterations: value.iterations,
+    saltHex: value.saltHex,
+    verifierHex: value.verifierHex,
+  }
+}
+
+function parseDeviceAuthCredential(value: unknown): DeviceAuthCredential | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (
+    value.version !== 1 ||
+    !isBase64UrlString(value.credentialId) ||
+    !isString(value.createdAt)
+  ) {
+    return null
+  }
+
+  const transports =
+    value.transports === undefined
+      ? undefined
+      : Array.isArray(value.transports)
+        ? value.transports
+            .map((transport) => parseDeviceAuthTransport(transport))
+            .filter((transport): transport is DeviceAuthTransport => transport !== null)
+        : null
+
+  if (transports === null) {
+    return null
+  }
+
+  return {
+    version: 1,
+    credentialId: value.credentialId,
+    createdAt: value.createdAt,
+    ...(transports ? { transports } : {}),
+  }
+}
+
+function parseRecoveryCodeSet(value: unknown): RecoveryCodeSet | null {
+  if (!isRecord(value)) {
+    return null
+  }
+
+  if (
+    value.version !== 1 ||
+    value.hash !== 'SHA-256' ||
+    !isHexStringWithLength(value.saltHex, RECOVERY_CODE_SALT_HEX_LENGTH) ||
+    !isString(value.generatedAt) ||
+    !Array.isArray(value.verifiers)
+  ) {
+    return null
+  }
+
+  if (value.verifiers.length === 0) {
+    return null
+  }
+
+  const parsedVerifiers = value.verifiers
+    .map((verifier) => parseRecoveryCodeVerifier(verifier))
+
+  if (parsedVerifiers.some((verifier) => verifier === null)) {
+    return null
+  }
+
+  const verifiers = parsedVerifiers as RecoveryCodeVerifier[]
+
+  return {
+    version: 1,
+    hash: 'SHA-256',
+    saltHex: value.saltHex,
+    generatedAt: value.generatedAt,
+    verifiers,
+  }
+}
+
 function isAppSettings(value: unknown): value is AppSettings {
   if (!isRecord(value)) {
     return false
@@ -367,7 +523,18 @@ function isAppSettings(value: unknown): value is AppSettings {
     isNonNegativeNumber(value.changesSinceBackup) &&
     (value.lastReminderAt === null || isString(value.lastReminderAt)) &&
     (value.hideOverspendingBudgetsInHome === undefined ||
-      typeof value.hideOverspendingBudgetsInHome === 'boolean')
+      typeof value.hideOverspendingBudgetsInHome === 'boolean') &&
+    (value.hideSensitiveData === undefined || typeof value.hideSensitiveData === 'boolean') &&
+    (value.lockAppOnLaunch === undefined || typeof value.lockAppOnLaunch === 'boolean') &&
+    (value.appLockPinVerifier === undefined ||
+      value.appLockPinVerifier === null ||
+      parseAppLockPinVerifier(value.appLockPinVerifier) !== null) &&
+    (value.deviceAuthCredential === undefined ||
+      value.deviceAuthCredential === null ||
+      parseDeviceAuthCredential(value.deviceAuthCredential) !== null) &&
+    (value.recoveryCodeSet === undefined ||
+      value.recoveryCodeSet === null ||
+      parseRecoveryCodeSet(value.recoveryCodeSet) !== null)
   )
 }
 
@@ -428,15 +595,55 @@ function parseAppSettings(
       : useLegacyBackupDefaults
         ? legacyBackupPreferenceDefaults.hideOverspendingBudgetsInHome
         : null
+  const hideSensitiveData =
+    typeof value.hideSensitiveData === 'boolean'
+      ? value.hideSensitiveData
+      : useLegacyBackupDefaults
+        ? legacyBackupPreferenceDefaults.hideSensitiveData
+        : null
+  const lockAppOnLaunch =
+    typeof value.lockAppOnLaunch === 'boolean'
+      ? value.lockAppOnLaunch
+      : useLegacyBackupDefaults
+        ? legacyBackupPreferenceDefaults.lockAppOnLaunch
+        : null
+  const appLockPinVerifier =
+    value.appLockPinVerifier === null || value.appLockPinVerifier === undefined
+      ? useLegacyBackupDefaults && value.appLockPinVerifier === undefined
+        ? legacyBackupPreferenceDefaults.appLockPinVerifier
+        : null
+      : parseAppLockPinVerifier(value.appLockPinVerifier)
+  const deviceAuthCredential =
+    value.deviceAuthCredential === null || value.deviceAuthCredential === undefined
+      ? useLegacyBackupDefaults && value.deviceAuthCredential === undefined
+        ? legacyBackupPreferenceDefaults.deviceAuthCredential
+        : null
+      : parseDeviceAuthCredential(value.deviceAuthCredential)
+  const recoveryCodeSet =
+    value.recoveryCodeSet === null || value.recoveryCodeSet === undefined
+      ? useLegacyBackupDefaults && value.recoveryCodeSet === undefined
+        ? legacyBackupPreferenceDefaults.recoveryCodeSet
+        : null
+      : parseRecoveryCodeSet(value.recoveryCodeSet)
 
   if (
     hasSeenPrivacyModal === null ||
     backupRemindersEnabled === null ||
     changesSinceBackup === null ||
-    hideOverspendingBudgetsInHome === null
+    hideOverspendingBudgetsInHome === null ||
+    hideSensitiveData === null ||
+    lockAppOnLaunch === null ||
+    appLockPinVerifier === undefined ||
+    deviceAuthCredential === undefined ||
+    recoveryCodeSet === undefined
   ) {
     return null
   }
+
+  const hasPinFallback = appLockPinVerifier !== null
+  const normalizedLockAppOnLaunch = hasPinFallback ? lockAppOnLaunch : false
+  const normalizedDeviceAuthCredential = hasPinFallback ? deviceAuthCredential : null
+  const normalizedRecoveryCodeSet = hasPinFallback ? recoveryCodeSet : null
 
   return {
     theme: value.theme,
@@ -448,6 +655,11 @@ function parseAppSettings(
     changesSinceBackup,
     lastReminderAt,
     hideOverspendingBudgetsInHome,
+    hideSensitiveData,
+    lockAppOnLaunch: normalizedLockAppOnLaunch,
+    appLockPinVerifier,
+    deviceAuthCredential: normalizedDeviceAuthCredential,
+    recoveryCodeSet: normalizedRecoveryCodeSet,
   }
 }
 

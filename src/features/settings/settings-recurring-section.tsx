@@ -2,13 +2,15 @@ import {
   getRecurringFrequencyLabel,
   getRecurringTemplateLabel,
 } from '../../domain/recurring'
-import { formatCurrency, formatLongDateLabel } from '../../domain/formatters'
+import { formatLongDateLabel } from '../../domain/formatters'
 import type { Category, RecurringTemplate } from '../../domain/models'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 
 interface SettingsRecurringSectionProps {
   activeRecurringTemplates: RecurringTemplate[]
   categories: Category[]
   currency: string
+  hideSensitiveValues: boolean
   onBack: () => void
   onOpenRecurringEditor: (templateId: string) => void
 }
@@ -17,6 +19,7 @@ export function SettingsRecurringSection({
   activeRecurringTemplates,
   categories,
   currency,
+  hideSensitiveValues,
   onBack,
   onOpenRecurringEditor,
 }: SettingsRecurringSectionProps) {
@@ -80,7 +83,11 @@ export function SettingsRecurringSection({
                 <div className="settings-category-meta recurring-settings-meta">
                   <span className="micro-badge subtle">{template.type}</span>
                   <strong className="settings-row-value">
-                    {formatCurrency(template.amount, currency)}
+                    {formatSensitiveCurrency(
+                      template.amount,
+                      currency,
+                      hideSensitiveValues,
+                    )}
                   </strong>
                 </div>
               </button>

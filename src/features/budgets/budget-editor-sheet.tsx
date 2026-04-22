@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { formatCurrency } from '../../domain/formatters'
 import {
   previewAvailableToBudgetAfterBudgetChange,
   type BudgetAllocationSummary,
 } from '../../domain/selectors'
 import type { Budget, Category } from '../../domain/models'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 
 interface BudgetEditorSheetProps {
   mode: 'create' | 'edit'
@@ -13,6 +13,7 @@ interface BudgetEditorSheetProps {
   spent: number
   allocationSummary: BudgetAllocationSummary
   currency: string
+  hideSensitiveValues: boolean
   monthLabel: string
   onClose: () => void
   onSave: (input: {
@@ -63,6 +64,7 @@ export function BudgetEditorSheet({
   spent,
   allocationSummary,
   currency,
+  hideSensitiveValues,
   monthLabel,
   onClose,
   onSave,
@@ -89,8 +91,8 @@ export function BudgetEditorSheet({
   }, [allocationSummary, budget?.limit, limit])
   const previewLabel = preview
     ? preview.availableToBudgetForPeriod < 0
-      ? `After this budget: ${formatCurrency(preview.overAllocatedAmountForPeriod, currency)} over-allocated`
-      : `After this budget: ${formatCurrency(Math.max(preview.availableToBudgetForPeriod, 0), currency)} left`
+      ? `After this budget: ${formatSensitiveCurrency(preview.overAllocatedAmountForPeriod, currency, hideSensitiveValues)} over-allocated`
+      : `After this budget: ${formatSensitiveCurrency(Math.max(preview.availableToBudgetForPeriod, 0), currency, hideSensitiveValues)} left`
     : null
 
   useEffect(() => {
@@ -220,12 +222,12 @@ export function BudgetEditorSheet({
         <div className="mini-status-grid budget-sheet-stats">
           <div>
             <span>Spent this month</span>
-            <strong>{formatCurrency(spent, currency)}</strong>
+            <strong>{formatSensitiveCurrency(spent, currency, hideSensitiveValues)}</strong>
           </div>
           <div>
             <span>{budget ? 'Current limit' : 'Status'}</span>
             <strong>
-              {budget ? formatCurrency(budget.limit, currency) : 'No budget set'}
+              {budget ? formatSensitiveCurrency(budget.limit, currency, hideSensitiveValues) : 'No budget set'}
             </strong>
           </div>
         </div>

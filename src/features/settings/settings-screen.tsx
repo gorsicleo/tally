@@ -28,9 +28,13 @@ import {
   GITHUB_PROJECT_URL,
 } from './report-bug-info'
 import { ReportBugDialog } from './report-bug-dialog'
+import { AppLockPinDialog, type AppLockPinDialogMode } from './app-lock-pin-dialog'
+import { RecoveryCodesDialog } from './recovery-codes-dialog'
+import { RecoveryCodesPinDialog } from './recovery-codes-pin-dialog'
 import { SettingsBackupSection } from './settings-backup-section'
 import { SettingsCategoriesSection } from './settings-categories-section'
 import { SettingsGeneralSection } from './settings-general-section'
+import { SettingsPrivacySection } from './settings-privacy-section'
 import { SettingsRecurringSection } from './settings-recurring-section'
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'CZK']
@@ -331,7 +335,20 @@ export function SettingsScreen({
     deleteCategory,
     setTheme,
     setCurrency,
+    setHideSensitiveData,
+    setLockAppOnLaunchEnabled,
+    setupAppLock,
+    changeAppLockPin,
+    removeAppLock,
+    setupDeviceAuthentication,
+    removeDeviceAuthentication,
+    isDeviceAuthSupported,
+    isDeviceAuthConfigured,
+    isRecoveryCodesConfigured,
+    recoveryCodesRemaining,
+    generateRecoveryCodes,
     setHideOverspendingBudgetsInHome,
+    shouldHideSensitiveValues,
     updateBackupSettings,
     replaceState,
   } = useFinance()
@@ -349,6 +366,9 @@ export function SettingsScreen({
     prepared: PreparedBackupRestore
   } | null>(null)
   const [isReportBugDialogOpen, setIsReportBugDialogOpen] = useState(false)
+  const [appLockDialogMode, setAppLockDialogMode] = useState<AppLockPinDialogMode | null>(null)
+  const [isRecoveryCodesPinDialogOpen, setIsRecoveryCodesPinDialogOpen] = useState(false)
+  const [generatedRecoveryCodes, setGeneratedRecoveryCodes] = useState<string[] | null>(null)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   const appVersion = useMemo(() => {
@@ -718,6 +738,63 @@ export function SettingsScreen({
             }}
           />
 
+          <SettingsPrivacySection
+            hideSensitiveData={state.settings.hideSensitiveData ?? false}
+            lockAppOnLaunch={state.settings.lockAppOnLaunch ?? false}
+            hasAppLockPin={state.settings.appLockPinVerifier !== null}
+            isDeviceAuthSupported={isDeviceAuthSupported}
+            hasDeviceAuthCredential={isDeviceAuthConfigured}
+            isRecoveryCodesConfigured={isRecoveryCodesConfigured}
+            recoveryCodesRemaining={recoveryCodesRemaining}
+            onHideSensitiveDataChange={(hidden) => {
+              setHideSensitiveData(hidden)
+            }}
+            onLockAppOnLaunchChange={(enabled) => {
+              if (enabled) {
+                if (state.settings.appLockPinVerifier) {
+                  setLockAppOnLaunchEnabled(true)
+                } else {
+                  setAppLockDialogMode('setup')
+                }
+
+                return
+              }
+
+              setAppLockDialogMode('remove')
+            }}
+            onChangePin={() => {
+              setAppLockDialogMode('change')
+            }}
+            onSetupDeviceAuthentication={() => {
+              void setupDeviceAuthentication().then((message) => {
+                if (message) {
+                  onShowToast(message)
+                  return
+                }
+
+                onShowToast('Device authentication enabled.')
+              })
+            }}
+            onRemoveDeviceAuthentication={() => {
+              removeDeviceAuthentication()
+              onShowToast('Device authentication removed.')
+            }}
+            onGenerateRecoveryCodes={() => {
+              void generateRecoveryCodes(null).then((result) => {
+                if (typeof result === 'string') {
+                  onShowToast(result)
+                  return
+                }
+
+                setGeneratedRecoveryCodes(result)
+                onShowToast('Recovery codes generated.')
+              })
+            }}
+            onRegenerateRecoveryCodes={() => {
+              setIsRecoveryCodesPinDialogOpen(true)
+            }}
+          />
+
           <SettingsBackupSection
             lastBackupLabel={formatDateTimeLabel(state.settings.lastBackupAt)}
             backupRemindersEnabled={state.settings.backupRemindersEnabled}
@@ -857,6 +934,7 @@ export function SettingsScreen({
           activeRecurringTemplates={activeRecurringTemplates}
           categories={state.categories}
           currency={state.settings.currency}
+          hideSensitiveValues={shouldHideSensitiveValues}
           onBack={() => setView('main')}
           onOpenRecurringEditor={onOpenRecurringEditor}
         />
@@ -901,6 +979,40 @@ export function SettingsScreen({
           onCancel={() => setIsReportBugDialogOpen(false)}
           onCopyAppInfo={handleCopyBugReportInfo}
           onOpenGithubIssue={handleOpenGithubIssue}
+        />
+      ) : null}
+
+      {appLockDialogMode ? (
+        <AppLockPinDialog
+          mode={appLockDialogMode}
+          onCancel={() => setAppLockDialogMode(null)}
+          onSetup={setupAppLock}
+          onChangePin={changeAppLockPin}
+          onRemove={removeAppLock}
+        />
+      ) : null}
+
+      {isRecoveryCodesPinDialogOpen ? (
+        <RecoveryCodesPinDialog
+          onCancel={() => setIsRecoveryCodesPinDialogOpen(false)}
+          onConfirm={async (pin) => {
+            const result = await generateRecoveryCodes(pin)
+
+            if (typeof result === 'string') {
+              return result
+            }
+
+            setGeneratedRecoveryCodes(result)
+            onShowToast('Recovery codes regenerated. Old codes are now invalid.')
+            return null
+          }}
+        />
+      ) : null}
+
+      {generatedRecoveryCodes ? (
+        <RecoveryCodesDialog
+          codes={generatedRecoveryCodes}
+          onClose={() => setGeneratedRecoveryCodes(null)}
         />
       ) : null}
     </div>

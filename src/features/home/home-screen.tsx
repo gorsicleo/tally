@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { formatCurrency, formatMonthLabel } from '../../domain/formatters'
+import { formatMonthLabel } from '../../domain/formatters'
 import {
   getBudgetSignals,
   getCategoryTotals,
@@ -12,6 +12,7 @@ import type { Transaction } from '../../domain/models'
 import { RecurringDueSection } from '../recurring/recurring-due-section'
 import { useFinance } from '../../state/use-finance'
 import { TransactionHistory } from '../transactions/transaction-history'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 import type { AppTab } from '../shell/tab-bar'
 
 interface HomeScreenProps {
@@ -27,7 +28,7 @@ export function HomeScreen({
   onEditRecurring,
   onShowToast,
 }: HomeScreenProps) {
-  const { state } = useFinance()
+  const { state, shouldHideSensitiveValues } = useFinance()
   const monthKey = useMemo(() => getMonthKey(), [])
   const monthLabel = useMemo(() => formatMonthLabel(monthKey), [monthKey])
   const monthTotals = useMemo(
@@ -60,8 +61,8 @@ export function HomeScreen({
     comparison.delta.expense === 0
       ? 'Your expense pace matches last month so far.'
       : comparison.delta.expense > 0
-        ? `You spent ${formatCurrency(comparison.delta.expense, currency)} more than last month.`
-        : `You spent ${formatCurrency(Math.abs(comparison.delta.expense), currency)} less than last month.`
+        ? `You spent ${formatSensitiveCurrency(comparison.delta.expense, currency, shouldHideSensitiveValues)} more than last month.`
+        : `You spent ${formatSensitiveCurrency(Math.abs(comparison.delta.expense), currency, shouldHideSensitiveValues)} less than last month.`
 
   return (
     <div className="screen-stack">
@@ -76,15 +77,21 @@ export function HomeScreen({
         <div className="financial-rows">
           <div className="financial-row">
             <span>Income</span>
-            <strong className="income">{formatCurrency(monthTotals.income, currency)}</strong>
+            <strong className="income">
+              {formatSensitiveCurrency(monthTotals.income, currency, shouldHideSensitiveValues)}
+            </strong>
           </div>
           <div className="financial-row">
             <span>Expenses</span>
-            <strong className="expense">{formatCurrency(monthTotals.expense, currency)}</strong>
+            <strong className="expense">
+              {formatSensitiveCurrency(monthTotals.expense, currency, shouldHideSensitiveValues)}
+            </strong>
           </div>
           <div className="financial-row net-row">
             <span>Net</span>
-            <strong className={netTone}>{formatCurrency(monthTotals.balance, currency)}</strong>
+            <strong className={netTone}>
+              {formatSensitiveCurrency(monthTotals.balance, currency, shouldHideSensitiveValues)}
+            </strong>
           </div>
         </div>
       </section>
@@ -101,9 +108,9 @@ export function HomeScreen({
           {budgetAlerts.map((entry) => {
             const statusLabel =
               entry.remaining >= 0
-                ? `${formatCurrency(entry.remaining, currency)} left`
-                : `${formatCurrency(Math.abs(entry.remaining), currency)} over`
-            const detailLabel = `${formatCurrency(entry.spent, currency)} / ${formatCurrency(entry.limit, currency)}`
+                ? `${formatSensitiveCurrency(entry.remaining, currency, shouldHideSensitiveValues)} left`
+                : `${formatSensitiveCurrency(Math.abs(entry.remaining), currency, shouldHideSensitiveValues)} over`
+            const detailLabel = `${formatSensitiveCurrency(entry.spent, currency, shouldHideSensitiveValues)} / ${formatSensitiveCurrency(entry.limit, currency, shouldHideSensitiveValues)}`
             const categoriesLabel = entry.categories.map((category) => category.name).join(', ')
 
             return (
@@ -163,6 +170,7 @@ export function HomeScreen({
           categories={state.categories}
           transactions={recentTransactions}
           currency={currency}
+          hideSensitiveValues={shouldHideSensitiveValues}
           emptyMessage="Your latest activity will show up here."
           onEdit={onEditTransaction}
         />
@@ -173,7 +181,7 @@ export function HomeScreen({
             <>
               <h3>Top category: {topCategory.name}</h3>
               <p>
-                {formatCurrency(topCategory.total, currency)} across {topCategory.count}{' '}
+                {formatSensitiveCurrency(topCategory.total, currency, shouldHideSensitiveValues)} across {topCategory.count}{' '}
                 transaction{topCategory.count === 1 ? '' : 's'} this month.
               </p>
             </>

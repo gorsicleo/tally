@@ -252,6 +252,44 @@ textarea {
   line-height: 1.08;
 }
 
+.sensitive-data-reveal-chip {
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  right: 14px;
+  z-index: 24;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(5, 12, 20, 0.66);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.sensitive-data-reveal-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.sensitive-data-reveal-chip.revealed {
+  background: rgba(9, 50, 44, 0.72);
+  border-color: rgba(71, 209, 109, 0.32);
+}
+
+:root[data-theme='light'] .sensitive-data-reveal-chip {
+  background: rgba(255, 255, 255, 0.86);
+  color: #18232e;
+  border-color: rgba(18, 40, 65, 0.16);
+}
+
 .status-cluster,
 .header-actions,
 .button-row,
@@ -441,6 +479,46 @@ textarea:focus-visible {
 .report-bug-modal-panel {
   max-width: 520px;
   gap: 16px;
+}
+
+.security-modal-panel {
+  max-width: 520px;
+  gap: 16px;
+}
+
+.unlock-gate-shell {
+  min-height: 100svh;
+  place-content: center;
+}
+
+.unlock-gate-panel {
+  width: min(440px, 100%);
+  margin-inline: auto;
+  display: grid;
+  gap: 16px;
+  min-height: min(460px, calc(100svh - 36px));
+  align-content: center;
+  text-align: center;
+}
+
+.unlock-gate-copy {
+  color: var(--text-secondary);
+  max-width: 28ch;
+  margin: 0 auto;
+}
+
+.unlock-gate-form {
+  width: min(320px, 100%);
+  margin: 0 auto;
+}
+
+.unlock-gate-form label {
+  text-align: left;
+}
+
+.unlock-gate-actions {
+  display: flex;
+  justify-content: center;
 }
 
 .backup-modal-copy,
@@ -776,6 +854,10 @@ textarea:focus-visible {
   overflow-x: auto;
   padding: 2px 2px 6px;
   scrollbar-width: none;
+}
+
+.records-screen.with-sensitive-data-reveal-chip .records-quick-filters {
+  top: calc(52px + env(safe-area-inset-top));
 }
 
 .records-quick-filters::-webkit-scrollbar {
@@ -1328,6 +1410,10 @@ textarea:focus-visible {
   letter-spacing: 0.14em;
   font-weight: 800;
   color: var(--text-muted);
+}
+
+.records-screen.with-sensitive-data-reveal-chip .history-date-header {
+  top: calc(122px + env(safe-area-inset-top));
 }
 
 .settings-group-list {
@@ -2904,8 +2990,16 @@ textarea {
     top: 12px;
   }
 
+  .records-screen.with-sensitive-data-reveal-chip .records-quick-filters {
+    top: calc(56px + env(safe-area-inset-top));
+  }
+
   .history-date-header {
     top: 70px;
+  }
+
+  .records-screen.with-sensitive-data-reveal-chip .history-date-header {
+    top: calc(130px + env(safe-area-inset-top));
   }
 
   .sheet-footer-actions.with-delete {

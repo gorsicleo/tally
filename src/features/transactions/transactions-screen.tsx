@@ -1,9 +1,9 @@
 import { useDeferredValue, useMemo, useState } from 'react'
-import { formatCurrency } from '../../domain/formatters'
 import { getOverviewForTransactions, getSortedTransactions } from '../../domain/selectors'
 import type { Transaction, TransactionType } from '../../domain/models'
 import { useFinance } from '../../state/use-finance'
 import { toLocalDateKey } from '../../utils/date'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 import { TransactionHistory } from './transaction-history'
 
 type DatePreset = 'all' | 'today' | 'week' | 'month' | 'custom'
@@ -47,7 +47,8 @@ function getPresetRange(preset: Exclude<DatePreset, 'custom'>): {
 export function TransactionsScreen({
   onEditTransaction,
 }: TransactionsScreenProps) {
-  const { state } = useFinance()
+  const { state, shouldHideSensitiveValues } = useFinance()
+  const hasSensitiveDataRevealChip = state.settings.hideSensitiveData === true
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all')
@@ -115,7 +116,11 @@ export function TransactionsScreen({
   }
 
   return (
-    <div className="screen-stack">
+    <div
+      className={`screen-stack records-screen ${
+        hasSensitiveDataRevealChip ? 'with-sensitive-data-reveal-chip' : ''
+      }`.trim()}
+    >
       <section className="panel toolbar-panel records-toolbar-panel">
         <div>
           <p className="eyebrow">RECORDS</p>
@@ -139,7 +144,13 @@ export function TransactionsScreen({
         <div className="records-toolbar-footer">
           <div className="records-total-bar">
             <span>{filteredTransactions.length} results</span>
-            <strong>{formatCurrency(filteredOverview.balance, state.settings.currency)}</strong>
+            <strong>
+              {formatSensitiveCurrency(
+                filteredOverview.balance,
+                state.settings.currency,
+                shouldHideSensitiveValues,
+              )}
+            </strong>
           </div>
 
           <button
@@ -246,6 +257,7 @@ export function TransactionsScreen({
         categories={state.categories}
         transactions={visibleTransactions}
         currency={state.settings.currency}
+        hideSensitiveValues={shouldHideSensitiveValues}
         emptyMessage="No transactions match this filter yet."
         onEdit={onEditTransaction}
       />

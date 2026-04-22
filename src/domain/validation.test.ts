@@ -45,9 +45,311 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState?.settings.changesSinceBackup).toBe(0)
     expect(parsedState?.settings.lastReminderAt).toBeNull()
     expect(parsedState?.settings.hideOverspendingBudgetsInHome).toBe(false)
+    expect(parsedState?.settings.hideSensitiveData).toBe(false)
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(false)
+    expect(parsedState?.settings.appLockPinVerifier).toBeNull()
+    expect(parsedState?.settings.deviceAuthCredential).toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
     expect(parsedState?.recurringTemplates).toEqual([])
     expect(parsedState?.transactions[0].recurringTemplateId).toBeNull()
     expect(parsedState?.transactions[0].recurringOccurrenceDate).toBeNull()
+  })
+
+  it('normalizes lock-on-launch off when persisted state has no verifier', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: null,
+        deviceAuthCredential: {
+          version: 1,
+          credentialId: 'abc123_XYZ',
+          createdAt: '2026-03-01T10:00:00.000Z',
+          transports: ['internal'],
+        },
+        recoveryCodeSet: {
+          version: 1,
+          hash: 'SHA-256',
+          saltHex: 'abcd1234',
+          generatedAt: '2026-03-01T10:00:00.000Z',
+          verifiers: [{ id: 'rc-1', verifierHex: 'deadbeef', usedAt: null }],
+        },
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(false)
+    expect(parsedState?.settings.appLockPinVerifier).toBeNull()
+    expect(parsedState?.settings.deviceAuthCredential).toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
+  })
+
+  it('rejects app-lock verifier with unexpected PBKDF2 iterations and clears lock metadata', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: {
+          version: 1,
+          algorithm: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 9_999_999,
+          saltHex: '0123456789abcdef0123456789abcdef',
+          verifierHex: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        },
+        deviceAuthCredential: {
+          version: 1,
+          credentialId: 'abc123_XYZ',
+          createdAt: '2026-03-01T10:00:00.000Z',
+          transports: ['internal'],
+        },
+        recoveryCodeSet: {
+          version: 1,
+          hash: 'SHA-256',
+          saltHex: 'abcd1234',
+          generatedAt: '2026-03-01T10:00:00.000Z',
+          verifiers: [{ id: 'rc-1', verifierHex: 'deadbeef', usedAt: null }],
+        },
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(false)
+    expect(parsedState?.settings.appLockPinVerifier).toBeNull()
+    expect(parsedState?.settings.deviceAuthCredential).toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
+  })
+
+  it('rejects app-lock verifier with malformed hex lengths and clears lock metadata', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: {
+          version: 1,
+          algorithm: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 200000,
+          saltHex: 'abc',
+          verifierHex: 'abcd',
+        },
+        deviceAuthCredential: {
+          version: 1,
+          credentialId: 'abc123_XYZ',
+          createdAt: '2026-03-01T10:00:00.000Z',
+          transports: ['internal'],
+        },
+        recoveryCodeSet: {
+          version: 1,
+          hash: 'SHA-256',
+          saltHex: 'abcd1234',
+          generatedAt: '2026-03-01T10:00:00.000Z',
+          verifiers: [{ id: 'rc-1', verifierHex: 'deadbeef', usedAt: null }],
+        },
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(false)
+    expect(parsedState?.settings.appLockPinVerifier).toBeNull()
+    expect(parsedState?.settings.deviceAuthCredential).toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
+  })
+
+  it('clears recovery code set when salt/verifier hex lengths are invalid', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: {
+          version: 1,
+          algorithm: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 200000,
+          saltHex: '0123456789abcdef0123456789abcdef',
+          verifierHex: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        },
+        deviceAuthCredential: null,
+        recoveryCodeSet: {
+          version: 1,
+          hash: 'SHA-256',
+          saltHex: 'abc',
+          generatedAt: '2026-03-01T10:00:00.000Z',
+          verifiers: [{ id: 'rc-1', verifierHex: 'abcd', usedAt: null }],
+        },
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(true)
+    expect(parsedState?.settings.appLockPinVerifier).not.toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
+  })
+
+  it('clears recovery code set when any verifier entry is malformed', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: {
+          version: 1,
+          algorithm: 'PBKDF2',
+          hash: 'SHA-256',
+          iterations: 200000,
+          saltHex: '0123456789abcdef0123456789abcdef',
+          verifierHex: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        },
+        deviceAuthCredential: null,
+        recoveryCodeSet: {
+          version: 1,
+          hash: 'SHA-256',
+          saltHex: '0123456789abcdef0123456789abcdef',
+          generatedAt: '2026-03-01T10:00:00.000Z',
+          verifiers: [
+            {
+              id: 'rc-1',
+              verifierHex: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+              usedAt: null,
+            },
+            {
+              id: 'rc-2',
+              verifierHex: 'deadbeef',
+              usedAt: null,
+            },
+          ],
+        },
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(true)
+    expect(parsedState?.settings.appLockPinVerifier).not.toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
   })
 
   it('migrates legacy single-category budgets to categoryIds and infers names', () => {

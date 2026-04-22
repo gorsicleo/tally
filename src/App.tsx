@@ -11,6 +11,9 @@ import {
   BackupReminderCard,
   PrivacyFirstModal,
 } from './features/backup/backup-ui'
+import { AppLockGate } from './features/privacy/app-lock-gate'
+import { shouldRequireAppLock } from './features/privacy/app-lock'
+import { SensitiveDataRevealChip } from './features/privacy/sensitive-data-reveal-chip'
 import { UpdateManager } from './features/backup/update-manager'
 import { useInstallPrompt } from './pwa/register-service-worker'
 import { AppHeader } from './features/shell/app-header'
@@ -41,6 +44,16 @@ function FinanceWorkspace() {
     deleteTransaction,
     stopRecurringTemplate,
     updateBackupSettings,
+    isAppUnlocked,
+    appLockCooldownUntil,
+    unlockApp,
+    isDeviceAuthSupported,
+    isDeviceAuthConfigured,
+    unlockAppWithDeviceAuthentication,
+    recoveryCodesRemaining,
+    unlockAppWithRecoveryCode,
+    sensitiveDataRevealedForSession,
+    revealSensitiveDataForSession,
   } = useFinance()
   const { canInstall, install, isInstalled } = useInstallPrompt()
   const [activeTab, setActiveTab] = useState<AppTab>('home')
@@ -260,6 +273,26 @@ function FinanceWorkspace() {
     editorTransactionId === null &&
     isBackupReminderVisible &&
     state.settings.backupRemindersEnabled
+  const showAppLockGate =
+    isLoaded && shouldRequireAppLock(state.settings) && !isAppUnlocked
+
+  if (showAppLockGate) {
+    return (
+      <div className="app-shell unlock-gate-shell">
+        <div className="backdrop glow-1" aria-hidden="true" />
+        <div className="backdrop glow-2" aria-hidden="true" />
+
+        <AppLockGate
+          cooldownUntil={appLockCooldownUntil}
+          canUseDeviceAuthentication={isDeviceAuthSupported && isDeviceAuthConfigured}
+          canUseRecoveryCodes={recoveryCodesRemaining > 0}
+          onUnlock={unlockApp}
+          onUnlockWithDeviceAuthentication={unlockAppWithDeviceAuthentication}
+          onUnlockWithRecoveryCode={unlockAppWithRecoveryCode}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="app-shell">
@@ -270,6 +303,13 @@ function FinanceWorkspace() {
         key={activeTab}
         title={activeMeta.title}
       />
+
+      {state.settings.hideSensitiveData ? (
+        <SensitiveDataRevealChip
+          isRevealedForSession={sensitiveDataRevealedForSession}
+          onReveal={revealSensitiveDataForSession}
+        />
+      ) : null}
 
       <main className="app-main">
         {isLoaded ? <UpdateManager onCreateBackup={() => createBackup()} /> : null}
