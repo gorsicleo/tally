@@ -196,18 +196,19 @@ export function AppLockGate({
                 setError(null)
               }}
               placeholder="XXXX-XXXX"
-              disabled={isBusy}
+              disabled={isBusy || isCoolingDown}
               required
             />
           </label>
 
           {error ? <p className="inline-error">{error}</p> : null}
+          {cooldownLabel ? <p className="support-copy">{cooldownLabel}</p> : null}
 
           <div className="unlock-gate-actions">
             <button
               type="submit"
               className="submit-button"
-              disabled={isBusy || recoveryCode.trim().length === 0}
+              disabled={isBusy || isCoolingDown || recoveryCode.trim().length === 0}
             >
               {busyMode === 'pin' ? 'Checking code...' : 'Unlock with recovery code'}
             </button>
