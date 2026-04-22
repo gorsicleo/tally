@@ -4,6 +4,38 @@ export type CategoryKind = TransactionType | 'both'
 export type RecurringFrequency = 'monthly' | 'custom'
 export type CategorySystem = 'uncategorized' | null
 
+export interface AppLockPinVerifier {
+  version: 1
+  algorithm: 'PBKDF2'
+  hash: 'SHA-256'
+  iterations: number
+  saltHex: string
+  verifierHex: string
+}
+
+export type DeviceAuthTransport = 'usb' | 'nfc' | 'ble' | 'internal' | 'hybrid'
+
+export interface DeviceAuthCredential {
+  version: 1
+  credentialId: string
+  createdAt: string
+  transports?: DeviceAuthTransport[]
+}
+
+export interface RecoveryCodeVerifier {
+  id: string
+  verifierHex: string
+  usedAt: string | null
+}
+
+export interface RecoveryCodeSet {
+  version: 1
+  hash: 'SHA-256'
+  saltHex: string
+  generatedAt: string
+  verifiers: RecoveryCodeVerifier[]
+}
+
 export interface BackupPreferences {
   hasSeenPrivacyModal: boolean
   backupRemindersEnabled: boolean
@@ -62,6 +94,10 @@ export interface AppSettings extends BackupPreferences {
   currency: string
   hideOverspendingBudgetsInHome?: boolean
   hideSensitiveData?: boolean
+  lockAppOnLaunch?: boolean
+  appLockPinVerifier?: AppLockPinVerifier | null
+  deviceAuthCredential?: DeviceAuthCredential | null
+  recoveryCodeSet?: RecoveryCodeSet | null
 }
 
 export interface FinanceState {

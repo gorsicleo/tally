@@ -93,10 +93,26 @@ export interface FinanceContextValue {
   setTheme: (theme: ThemeMode) => void
   setCurrency: (currency: string) => void
   setHideSensitiveData: (hidden: boolean) => void
+  setLockAppOnLaunchEnabled: (enabled: boolean) => void
+  setupAppLock: (pin: string) => Promise<string | null>
+  changeAppLockPin: (currentPin: string, nextPin: string) => Promise<string | null>
+  removeAppLock: (pin: string) => Promise<string | null>
+  unlockApp: (pin: string) => Promise<string | null>
+  setupDeviceAuthentication: () => Promise<string | null>
+  removeDeviceAuthentication: () => void
+  unlockAppWithDeviceAuthentication: () => Promise<string | null>
+  generateRecoveryCodes: (currentPin: string | null) => Promise<string[] | string>
+  unlockAppWithRecoveryCode: (code: string) => Promise<string | null>
   setHideOverspendingBudgetsInHome: (hidden: boolean) => void
+  isAppUnlocked: boolean
+  appLockCooldownUntil: number | null
+  isDeviceAuthSupported: boolean
+  isDeviceAuthConfigured: boolean
+  isRecoveryCodesConfigured: boolean
+  recoveryCodesRemaining: number
   sensitiveDataRevealedForSession: boolean
   shouldHideSensitiveValues: boolean
-  revealSensitiveDataForSession: () => void
+  revealSensitiveDataForSession: () => Promise<string | null>
   updateBackupSettings: (settings: Partial<BackupPreferences>) => void
   replaceState: (nextState: FinanceState) => Promise<void>
 }

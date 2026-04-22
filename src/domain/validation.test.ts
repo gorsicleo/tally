@@ -46,9 +46,67 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState?.settings.lastReminderAt).toBeNull()
     expect(parsedState?.settings.hideOverspendingBudgetsInHome).toBe(false)
     expect(parsedState?.settings.hideSensitiveData).toBe(false)
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(false)
+    expect(parsedState?.settings.appLockPinVerifier).toBeNull()
+    expect(parsedState?.settings.deviceAuthCredential).toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
     expect(parsedState?.recurringTemplates).toEqual([])
     expect(parsedState?.transactions[0].recurringTemplateId).toBeNull()
     expect(parsedState?.transactions[0].recurringOccurrenceDate).toBeNull()
+  })
+
+  it('normalizes lock-on-launch off when persisted state has no verifier', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: true,
+        appLockPinVerifier: null,
+        deviceAuthCredential: {
+          version: 1,
+          credentialId: 'abc123_XYZ',
+          createdAt: '2026-03-01T10:00:00.000Z',
+          transports: ['internal'],
+        },
+        recoveryCodeSet: {
+          version: 1,
+          hash: 'SHA-256',
+          saltHex: 'abcd1234',
+          generatedAt: '2026-03-01T10:00:00.000Z',
+          verifiers: [{ id: 'rc-1', verifierHex: 'deadbeef', usedAt: null }],
+        },
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.settings.lockAppOnLaunch).toBe(false)
+    expect(parsedState?.settings.appLockPinVerifier).toBeNull()
+    expect(parsedState?.settings.deviceAuthCredential).toBeNull()
+    expect(parsedState?.settings.recoveryCodeSet).toBeNull()
   })
 
   it('migrates legacy single-category budgets to categoryIds and infers names', () => {

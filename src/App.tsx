@@ -11,6 +11,8 @@ import {
   BackupReminderCard,
   PrivacyFirstModal,
 } from './features/backup/backup-ui'
+import { AppLockGate } from './features/privacy/app-lock-gate'
+import { shouldRequireAppLock } from './features/privacy/app-lock'
 import { SensitiveDataRevealChip } from './features/privacy/sensitive-data-reveal-chip'
 import { UpdateManager } from './features/backup/update-manager'
 import { useInstallPrompt } from './pwa/register-service-worker'
@@ -42,6 +44,14 @@ function FinanceWorkspace() {
     deleteTransaction,
     stopRecurringTemplate,
     updateBackupSettings,
+    isAppUnlocked,
+    appLockCooldownUntil,
+    unlockApp,
+    isDeviceAuthSupported,
+    isDeviceAuthConfigured,
+    unlockAppWithDeviceAuthentication,
+    isRecoveryCodesConfigured,
+    unlockAppWithRecoveryCode,
     sensitiveDataRevealedForSession,
     revealSensitiveDataForSession,
   } = useFinance()
@@ -263,6 +273,26 @@ function FinanceWorkspace() {
     editorTransactionId === null &&
     isBackupReminderVisible &&
     state.settings.backupRemindersEnabled
+  const showAppLockGate =
+    isLoaded && shouldRequireAppLock(state.settings) && !isAppUnlocked
+
+  if (showAppLockGate) {
+    return (
+      <div className="app-shell unlock-gate-shell">
+        <div className="backdrop glow-1" aria-hidden="true" />
+        <div className="backdrop glow-2" aria-hidden="true" />
+
+        <AppLockGate
+          cooldownUntil={appLockCooldownUntil}
+          canUseDeviceAuthentication={isDeviceAuthSupported && isDeviceAuthConfigured}
+          canUseRecoveryCodes={isRecoveryCodesConfigured}
+          onUnlock={unlockApp}
+          onUnlockWithDeviceAuthentication={unlockAppWithDeviceAuthentication}
+          onUnlockWithRecoveryCode={unlockAppWithRecoveryCode}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="app-shell">

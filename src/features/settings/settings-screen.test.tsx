@@ -12,6 +12,15 @@ import {
   GITHUB_PROJECT_URL,
 } from './report-bug-info'
 
+const appLockVerifierFixture = {
+  version: 1 as const,
+  algorithm: 'PBKDF2' as const,
+  hash: 'SHA-256' as const,
+  iterations: 200000,
+  saltHex: 'abcd1234',
+  verifierHex: 'deadbeef',
+}
+
 const restoreState = vi.hoisted(() => ({
   result: {
     ok: false as const,
@@ -157,6 +166,275 @@ describe('SettingsScreen direct flows', () => {
 
     await user.click(within(rowElement).getByRole('button', { name: 'Off' }))
     expect(setHideSensitiveData).toHaveBeenCalledWith(false)
+  })
+
+  it('opens PIN setup when enabling app lock for the first time and validates input', async () => {
+    const setupAppLock = vi.fn(async () => null)
+    const { user } = renderScreen(createState(), {
+      setupAppLock,
+    })
+
+    const rowElement = screen
+      .getByText('Lock app on launch')
+      .closest('.settings-list-row')
+
+    if (!(rowElement instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(rowElement).getByRole('button', { name: 'On' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Create a PIN' })
+    await user.type(within(dialog).getByLabelText('New PIN'), '12')
+    await user.type(within(dialog).getByLabelText('Confirm PIN'), '12')
+    await user.click(within(dialog).getByRole('button', { name: 'Save PIN' }))
+
+    expect(await within(dialog).findByText('PIN must be at least 4 digits.')).toBeInTheDocument()
+
+    await user.clear(within(dialog).getByLabelText('New PIN'))
+    await user.clear(within(dialog).getByLabelText('Confirm PIN'))
+    await user.type(within(dialog).getByLabelText('New PIN'), '1234')
+    await user.type(within(dialog).getByLabelText('Confirm PIN'), '9999')
+    await user.click(within(dialog).getByRole('button', { name: 'Save PIN' }))
+
+    expect(await within(dialog).findByText('PIN confirmation does not match.')).toBeInTheDocument()
+
+    await user.clear(within(dialog).getByLabelText('New PIN'))
+    await user.clear(within(dialog).getByLabelText('Confirm PIN'))
+    await user.type(within(dialog).getByLabelText('New PIN'), '1234')
+    await user.type(within(dialog).getByLabelText('Confirm PIN'), '1234')
+    await user.click(within(dialog).getByRole('button', { name: 'Save PIN' }))
+
+    await waitFor(() => {
+      expect(setupAppLock).toHaveBeenCalledWith('1234')
+      expect(screen.queryByRole('dialog', { name: 'Create a PIN' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('keeps app lock disabled when PIN setup is cancelled', async () => {
+    const setupAppLock = vi.fn(async () => null)
+    const { user } = renderScreen(createState(), {
+      setupAppLock,
+    })
+
+    const rowElement = screen
+      .getByText('Lock app on launch')
+      .closest('.settings-list-row')
+
+    if (!(rowElement instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(rowElement).getByRole('button', { name: 'On' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Create a PIN' })
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Create a PIN' })).not.toBeInTheDocument()
+    })
+    expect(setupAppLock).not.toHaveBeenCalled()
+  })
+
+  it('requires current pin when changing the app lock PIN', async () => {
+    const changeAppLockPin = vi.fn(async () => null)
+    const { user } = renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+        },
+      }),
+      { changeAppLockPin },
+    )
+
+    await user.click(screen.getByRole('button', { name: /Change PIN/i }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Change PIN' })
+    await user.type(within(dialog).getByLabelText('Current PIN'), '1234')
+    await user.type(within(dialog).getByLabelText('New PIN'), '5678')
+    await user.type(within(dialog).getByLabelText('Confirm PIN'), '5678')
+    await user.click(within(dialog).getByRole('button', { name: 'Update PIN' }))
+
+    await waitFor(() => {
+      expect(changeAppLockPin).toHaveBeenCalledWith('1234', '5678')
+    })
+  })
+
+  it('requires current pin before removing app lock', async () => {
+    const removeAppLock = vi.fn(async () => null)
+    const { user } = renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+        },
+      }),
+      { removeAppLock },
+    )
+
+    const rowElement = screen
+      .getByText('Lock app on launch')
+      .closest('.settings-list-row')
+
+    if (!(rowElement instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(rowElement).getByRole('button', { name: 'Off' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Remove app lock' })
+    await user.type(within(dialog).getByLabelText('Current PIN'), '1234')
+    await user.click(within(dialog).getByRole('button', { name: 'Remove app lock' }))
+
+    await waitFor(() => {
+      expect(removeAppLock).toHaveBeenCalledWith('1234')
+    })
+  })
+
+  it('shows PIN-only messaging when device authentication is unsupported', () => {
+    renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+        },
+      }),
+      {
+        isDeviceAuthSupported: false,
+        isDeviceAuthConfigured: false,
+      },
+    )
+
+    expect(screen.getByText('Device authentication')).toBeInTheDocument()
+    expect(screen.getByText('Not available on this browser')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Set up device authentication/i })).not.toBeInTheDocument()
+  })
+
+  it('shows setup path when device authentication is supported and not configured', async () => {
+    const setupDeviceAuthentication = vi.fn(async () => null)
+    const { user, onShowToast } = renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+          deviceAuthCredential: null,
+        },
+      }),
+      {
+        isDeviceAuthSupported: true,
+        isDeviceAuthConfigured: false,
+        setupDeviceAuthentication,
+      },
+    )
+
+    await user.click(screen.getByRole('button', { name: /Set up device authentication/i }))
+
+    await waitFor(() => {
+      expect(setupDeviceAuthentication).toHaveBeenCalled()
+      expect(onShowToast).toHaveBeenCalledWith('Device authentication enabled.')
+    })
+  })
+
+  it('allows removing configured device authentication', async () => {
+    const removeDeviceAuthentication = vi.fn()
+    const { user, onShowToast } = renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+          deviceAuthCredential: {
+            version: 1,
+            credentialId: 'abc123_XYZ',
+            createdAt: '2026-03-01T10:00:00.000Z',
+            transports: ['internal'],
+          },
+        },
+      }),
+      {
+        isDeviceAuthSupported: true,
+        isDeviceAuthConfigured: true,
+        removeDeviceAuthentication,
+      },
+    )
+
+    await user.click(screen.getByRole('button', { name: /Remove device authentication/i }))
+
+    expect(removeDeviceAuthentication).toHaveBeenCalled()
+    expect(onShowToast).toHaveBeenCalledWith('Device authentication removed.')
+  })
+
+  it('generates recovery codes and requires save confirmation before dismiss', async () => {
+    const generateRecoveryCodes = vi.fn(async () => ['ABCD-EFGH', 'JKLM-NPQR'])
+    const { user, onShowToast } = renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+          recoveryCodeSet: null,
+        },
+      }),
+      {
+        isRecoveryCodesConfigured: false,
+        recoveryCodesRemaining: 0,
+        generateRecoveryCodes,
+      },
+    )
+
+    await user.click(screen.getByRole('button', { name: /Generate one-time recovery codes/i }))
+
+    await waitFor(() => {
+      expect(generateRecoveryCodes).toHaveBeenCalledWith(null)
+      expect(onShowToast).toHaveBeenCalledWith('Recovery codes generated.')
+    })
+
+    const dialog = await screen.findByRole('dialog', { name: 'Save your recovery codes' })
+    expect(within(dialog).getByText('ABCD-EFGH')).toBeInTheDocument()
+    const doneButton = within(dialog).getByRole('button', { name: 'Done' })
+    expect(doneButton).toBeDisabled()
+
+    await user.click(within(dialog).getByRole('checkbox', { name: 'I saved these recovery codes.' }))
+    expect(doneButton).toBeEnabled()
+  })
+
+  it('requires current pin before regenerating recovery codes', async () => {
+    const generateRecoveryCodes = vi.fn(async () => ['WXYZ-2345'])
+    const { user, onShowToast } = renderScreen(
+      createState({
+        settings: {
+          ...createState().settings,
+          lockAppOnLaunch: true,
+          appLockPinVerifier: appLockVerifierFixture,
+          recoveryCodeSet: {
+            version: 1,
+            hash: 'SHA-256',
+            saltHex: 'abcd1234',
+            generatedAt: '2026-03-01T10:00:00.000Z',
+            verifiers: [{ id: 'rc-1', verifierHex: 'deadbeef', usedAt: null }],
+          },
+        },
+      }),
+      {
+        isRecoveryCodesConfigured: true,
+        recoveryCodesRemaining: 1,
+        generateRecoveryCodes,
+      },
+    )
+
+    await user.click(screen.getByRole('button', { name: /1 codes remaining • Regenerate/i }))
+
+    const pinDialog = await screen.findByRole('dialog', { name: 'Regenerate recovery codes' })
+    await user.type(within(pinDialog).getByLabelText('Current PIN'), '1234')
+    await user.click(within(pinDialog).getByRole('button', { name: 'Regenerate' }))
+
+    await waitFor(() => {
+      expect(generateRecoveryCodes).toHaveBeenCalledWith('1234')
+      expect(onShowToast).toHaveBeenCalledWith('Recovery codes regenerated. Old codes are now invalid.')
+    })
   })
 
   it('opens and closes report bug dialog from settings', async () => {

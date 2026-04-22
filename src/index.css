@@ -481,6 +481,46 @@ textarea:focus-visible {
   gap: 16px;
 }
 
+.security-modal-panel {
+  max-width: 520px;
+  gap: 16px;
+}
+
+.unlock-gate-shell {
+  min-height: 100svh;
+  place-content: center;
+}
+
+.unlock-gate-panel {
+  width: min(440px, 100%);
+  margin-inline: auto;
+  display: grid;
+  gap: 16px;
+  min-height: min(460px, calc(100svh - 36px));
+  align-content: center;
+  text-align: center;
+}
+
+.unlock-gate-copy {
+  color: var(--text-secondary);
+  max-width: 28ch;
+  margin: 0 auto;
+}
+
+.unlock-gate-form {
+  width: min(320px, 100%);
+  margin: 0 auto;
+}
+
+.unlock-gate-form label {
+  text-align: left;
+}
+
+.unlock-gate-actions {
+  display: flex;
+  justify-content: center;
+}
+
 .backup-modal-copy,
 .backup-reminder-copy,
 .settings-row-copy {

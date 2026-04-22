@@ -3,6 +3,11 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import App from './App'
 import { initialFinanceState } from './domain/default-data'
 import type { FinanceState, RecurringTemplate, Transaction } from './domain/models'
+import {
+  APP_LOCK_RELOCK_TIMEOUT_MS,
+  createAppLockPinVerifier,
+} from './features/privacy/app-lock'
+import { createRecoveryCodeSet } from './features/privacy/recovery-codes'
 import { GITHUB_ISSUE_CHOOSER_URL } from './features/settings/report-bug-info'
 import { toLocalDateKey } from './utils/date'
 import { renderWithUser } from './test/render-utils'
@@ -22,6 +27,30 @@ const storageState = vi.hoisted(() => ({
 const reportBugState = vi.hoisted(() => ({
   copySpy: vi.fn<(value: string) => Promise<boolean>>(async () => true),
   openSpy: vi.fn<(url: string) => boolean>(() => true),
+}))
+
+const deviceAuthState = vi.hoisted(() => ({
+  supported: false,
+  configuredCredential: {
+    version: 1 as const,
+    credentialId: 'abc123_XYZ',
+    createdAt: '2026-03-01T10:00:00.000Z',
+    transports: ['internal'] as const,
+  },
+  authenticateResult: {
+    ok: true,
+    message: null as string | null,
+  },
+  registerSpy: vi.fn(async () => ({
+    version: 1 as const,
+    credentialId: 'abc123_XYZ',
+    createdAt: '2026-03-01T10:00:00.000Z',
+    transports: ['internal'] as const,
+  })),
+  authenticateSpy: vi.fn(async () => ({
+    ok: true,
+    message: null as string | null,
+  })),
 }))
 
 vi.mock('./persistence/finance-storage', () => ({
@@ -60,6 +89,20 @@ vi.mock('./pwa/register-service-worker', () => ({
 
 vi.mock('./features/backup/update-manager', () => ({
   UpdateManager: () => null,
+}))
+
+vi.mock('./features/privacy/device-auth', () => ({
+  isDeviceAuthenticationSupported: () => deviceAuthState.supported,
+  isDeviceAuthenticationConfigured: (credential: unknown) =>
+    credential !== null && credential !== undefined,
+  registerDeviceAuthenticationCredential: async () => {
+    const result = await deviceAuthState.registerSpy()
+    return result
+  },
+  authenticateWithDeviceCredential: async () => {
+    await deviceAuthState.authenticateSpy()
+    return deviceAuthState.authenticateResult
+  },
 }))
 
 function createLoadedState(overrides: Partial<FinanceState> = {}): FinanceState {
@@ -120,8 +163,42 @@ function createRecurringTemplate(
   }
 }
 
+function setDocumentVisibilityState(value: DocumentVisibilityState) {
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => value,
+  })
+}
+
+async function createLockedSettings(pin = '1234') {
+  return {
+    lockAppOnLaunch: true,
+    appLockPinVerifier: await createAppLockPinVerifier(pin),
+  }
+}
+
+async function createLockedSettingsWithDeviceAuth(pin = '1234') {
+  return {
+    ...(await createLockedSettings(pin)),
+    deviceAuthCredential: deviceAuthState.configuredCredential,
+  }
+}
+
+async function createLockedSettingsWithRecoveryCodes(pin = '1234') {
+  const recovery = await createRecoveryCodeSet()
+
+  return {
+    settings: {
+      ...(await createLockedSettings(pin)),
+      recoveryCodeSet: recovery.codeSet,
+    },
+    firstCode: recovery.plaintextCodes[0],
+  }
+}
+
 describe('App UI behavior', () => {
   beforeEach(() => {
+    vi.useRealTimers()
     storageState.loadedState = createLoadedState()
     storageState.saveSpy.mockClear()
     storageState.downloadSpy.mockClear()
@@ -133,7 +210,12 @@ describe('App UI behavior', () => {
     reportBugState.copySpy.mockResolvedValue(true)
     reportBugState.openSpy.mockReset()
     reportBugState.openSpy.mockReturnValue(true)
+    deviceAuthState.supported = false
+    deviceAuthState.authenticateResult = { ok: true, message: null }
+    deviceAuthState.registerSpy.mockClear()
+    deviceAuthState.authenticateSpy.mockClear()
     window.localStorage.clear()
+    setDocumentVisibilityState('visible')
   })
 
   it('opens report bug dialog from settings and copies app info', async () => {
@@ -380,7 +462,7 @@ describe('App UI behavior', () => {
       }),
     )
 
-    expect(await screen.findByText('$2,000.00')).toBeInTheDocument()
+    expect((await screen.findAllByText('$2,000.00')).length).toBeGreaterThan(0)
     expect(await screen.findByText('$125.00')).toBeInTheDocument()
     expect(
       screen.getByRole('button', {
@@ -397,6 +479,51 @@ describe('App UI behavior', () => {
     })
     expect(screen.queryByText('$2,000.00')).not.toBeInTheDocument()
     expect(screen.queryByText('$125.00')).not.toBeInTheDocument()
+  })
+
+  it('uses device authentication for sensitive-data reveal when configured', async () => {
+    deviceAuthState.supported = true
+    deviceAuthState.authenticateResult = { ok: true, message: null }
+
+    storageState.loadedState = createLoadedState({
+      transactions: [
+        createTransaction({
+          id: 'txn-income-auth-reveal',
+          type: 'income',
+          amount: 2000,
+          categoryId: 'cat-salary',
+          note: 'Salary',
+        }),
+      ],
+      settings: {
+        ...createLoadedState().settings,
+        hideSensitiveData: true,
+        lockAppOnLaunch: false,
+        appLockPinVerifier: await createAppLockPinVerifier('1234'),
+        deviceAuthCredential: deviceAuthState.configuredCredential,
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', {
+      name: 'Sensitive values are hidden. Tap to reveal for this session',
+    })
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Sensitive values are hidden. Tap to reveal for this session',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(deviceAuthState.authenticateSpy).toHaveBeenCalled()
+    })
+    expect((await screen.findAllByText('$2,000.00')).length).toBeGreaterThan(0)
+    expect(
+      screen.getByRole('button', {
+        name: 'Sensitive values are visible for this session',
+      }),
+    ).toBeInTheDocument()
   })
 
   it('masks insights numeric labels while keeping charts visible when hide mode is enabled', async () => {
@@ -435,6 +562,469 @@ describe('App UI behavior', () => {
     expect(screen.queryByText('$80.00')).not.toBeInTheDocument()
     expect(screen.getAllByText('••••').length).toBeGreaterThan(0)
   })
+
+  it('enabling app lock requires successful PIN setup and persists only verifier metadata', async () => {
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+
+    storageState.saveSpy.mockClear()
+
+    const rowElement = screen
+      .getByText('Lock app on launch')
+      .closest('.settings-list-row')
+
+    if (!(rowElement instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(rowElement).getByRole('button', { name: 'On' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Create a PIN' })
+    await user.type(within(dialog).getByLabelText('New PIN'), '1234')
+    await user.type(within(dialog).getByLabelText('Confirm PIN'), '1234')
+    await user.click(within(dialog).getByRole('button', { name: 'Save PIN' }))
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as FinanceState | undefined
+    expect(latestSavedState?.settings.lockAppOnLaunch).toBe(true)
+    expect(latestSavedState?.settings.appLockPinVerifier).not.toBeNull()
+    expect(latestSavedState?.settings.appLockPinVerifier).not.toHaveProperty('pin')
+    expect(latestSavedState?.settings.appLockPinVerifier).toMatchObject({
+      algorithm: 'PBKDF2',
+      hash: 'SHA-256',
+    })
+    expect(
+      Object.values(latestSavedState?.settings.appLockPinVerifier ?? {}).includes('1234'),
+    ).toBe(false)
+  })
+
+  it('shows device-auth setup in settings when supported and stores credential metadata', async () => {
+    deviceAuthState.supported = true
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+
+    const lockRow = screen.getByText('Lock app on launch').closest('.settings-list-row')
+
+    if (!(lockRow instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(lockRow).getByRole('button', { name: 'On' }))
+
+    const pinDialog = await screen.findByRole('dialog', { name: 'Create a PIN' })
+    await user.type(within(pinDialog).getByLabelText('New PIN'), '1234')
+    await user.type(within(pinDialog).getByLabelText('Confirm PIN'), '1234')
+    await user.click(within(pinDialog).getByRole('button', { name: 'Save PIN' }))
+
+    await user.click(await screen.findByRole('button', { name: /Set up device authentication/i }))
+
+    await waitFor(() => {
+      expect(deviceAuthState.registerSpy).toHaveBeenCalled()
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as FinanceState | undefined
+    expect(latestSavedState?.settings.deviceAuthCredential).toMatchObject({
+      version: 1,
+      credentialId: 'abc123_XYZ',
+    })
+  })
+
+  it('stores only hashed recovery metadata after generating recovery codes', async () => {
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+
+    const lockRow = screen.getByText('Lock app on launch').closest('.settings-list-row')
+
+    if (!(lockRow instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(lockRow).getByRole('button', { name: 'On' }))
+    const pinDialog = await screen.findByRole('dialog', { name: 'Create a PIN' })
+    await user.type(within(pinDialog).getByLabelText('New PIN'), '1234')
+    await user.type(within(pinDialog).getByLabelText('Confirm PIN'), '1234')
+    await user.click(within(pinDialog).getByRole('button', { name: 'Save PIN' }))
+
+    await user.click(await screen.findByRole('button', { name: /Generate one-time recovery codes/i }))
+
+    const codesDialog = await screen.findByRole('dialog', { name: 'Save your recovery codes' })
+    const firstCode = within(codesDialog).getAllByText(/[A-Z2-9]{4}-[A-Z2-9]{4}/)[0].textContent ?? ''
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as FinanceState | undefined
+    expect(latestSavedState?.settings.recoveryCodeSet).not.toBeNull()
+    expect(JSON.stringify(latestSavedState?.settings.recoveryCodeSet)).not.toContain(firstCode)
+  })
+
+  it('keeps the app inaccessible while locked until authentication succeeds', async () => {
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    renderWithUser(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Unlock Tally' })).toBeInTheDocument()
+    expect(screen.queryByText('This month')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Primary navigation' })).not.toBeInTheDocument()
+  })
+
+  it('unlocks with a valid recovery code and keeps app lock enabled', async () => {
+    const { settings, firstCode } = await createLockedSettingsWithRecoveryCodes('1234')
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...settings,
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    await user.click(screen.getByRole('button', { name: 'Use recovery code' }))
+    await user.type(screen.getByLabelText('Recovery code'), firstCode)
+    await user.click(screen.getByRole('button', { name: 'Unlock with recovery code' }))
+
+    expect(await screen.findByText('This month')).toBeInTheDocument()
+  })
+
+  it('does not unlock with an invalid recovery code', async () => {
+    const { settings } = await createLockedSettingsWithRecoveryCodes('1234')
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...settings,
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    await user.click(screen.getByRole('button', { name: 'Use recovery code' }))
+    await user.type(screen.getByLabelText('Recovery code'), 'ABCD-EFGH')
+    await user.click(screen.getByRole('button', { name: 'Unlock with recovery code' }))
+
+    expect(await screen.findByText('Recovery code is invalid or already used.')).toBeInTheDocument()
+    expect(screen.queryByText('This month')).not.toBeInTheDocument()
+  })
+
+  it('invalidates a used recovery code and still allows PIN fallback', async () => {
+    let mockedNow = new Date('2026-04-22T12:00:00.000Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockedNow)
+    const { settings, firstCode } = await createLockedSettingsWithRecoveryCodes('1234')
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...settings,
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    await user.click(screen.getByRole('button', { name: 'Use recovery code' }))
+    await user.type(screen.getByLabelText('Recovery code'), firstCode)
+    await user.click(screen.getByRole('button', { name: 'Unlock with recovery code' }))
+    await screen.findByText('This month')
+
+    setDocumentVisibilityState('hidden')
+    fireEvent(document, new Event('visibilitychange'))
+    mockedNow += APP_LOCK_RELOCK_TIMEOUT_MS + 1_000
+    setDocumentVisibilityState('visible')
+    fireEvent(document, new Event('visibilitychange'))
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    await user.click(screen.getByRole('button', { name: 'Use recovery code' }))
+    await user.clear(screen.getByLabelText('Recovery code'))
+    await user.type(screen.getByLabelText('Recovery code'), firstCode)
+    await user.click(screen.getByRole('button', { name: 'Unlock with recovery code' }))
+
+    expect(await screen.findByText('Recovery code is invalid or already used.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Use PIN instead' }))
+    await user.type(screen.getByLabelText('PIN'), '1234')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+    expect(await screen.findByText('This month')).toBeInTheDocument()
+
+    nowSpy.mockRestore()
+  })
+
+  it('cleans up recovery metadata when app lock is fully removed', async () => {
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Settings' })
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+
+    const lockRow = screen.getByText('Lock app on launch').closest('.settings-list-row')
+
+    if (!(lockRow instanceof HTMLElement)) {
+      throw new Error('Expected app lock toggle row to be rendered.')
+    }
+
+    await user.click(within(lockRow).getByRole('button', { name: 'On' }))
+    const pinDialog = await screen.findByRole('dialog', { name: 'Create a PIN' })
+    await user.type(within(pinDialog).getByLabelText('New PIN'), '1234')
+    await user.type(within(pinDialog).getByLabelText('Confirm PIN'), '1234')
+    await user.click(within(pinDialog).getByRole('button', { name: 'Save PIN' }))
+
+    await user.click(await screen.findByRole('button', { name: /Generate one-time recovery codes/i }))
+    const recoveryDialog = await screen.findByRole('dialog', { name: 'Save your recovery codes' })
+    await user.click(within(recoveryDialog).getByRole('checkbox', { name: 'I saved these recovery codes.' }))
+    await user.click(within(recoveryDialog).getByRole('button', { name: 'Done' }))
+
+    await user.click(within(lockRow).getByRole('button', { name: 'Off' }))
+    const removeDialog = await screen.findByRole('dialog', { name: 'Remove app lock' })
+    await user.type(within(removeDialog).getByLabelText('Current PIN'), '1234')
+    await user.click(within(removeDialog).getByRole('button', { name: 'Remove app lock' }))
+
+    await waitFor(() => {
+      expect(storageState.saveSpy).toHaveBeenCalled()
+    })
+
+    const savedStates = storageState.saveSpy.mock.calls
+      .map((call) => call[0] as FinanceState)
+
+    expect(
+      savedStates.some(
+        (savedState) =>
+          savedState.settings.lockAppOnLaunch === false &&
+          savedState.settings.appLockPinVerifier === null &&
+          savedState.settings.recoveryCodeSet === null,
+      ),
+    ).toBe(true)
+  })
+
+  it('starts locked on fresh launch when app lock is enabled and unlocks with the correct PIN', async () => {
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Unlock Tally' })).toBeInTheDocument()
+    expect(screen.queryByText('This month')).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('PIN'), '1234')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByText('This month')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Unlock Tally' })).not.toBeInTheDocument()
+  })
+
+  it('keeps hide-sensitive masking active after unlock until explicitly revealed', async () => {
+    storageState.loadedState = createLoadedState({
+      transactions: [
+        createTransaction({
+          id: 'txn-post-unlock-mask',
+          type: 'income',
+          amount: 2000,
+          categoryId: 'cat-salary',
+          note: 'Salary',
+        }),
+      ],
+      settings: {
+        ...createLoadedState().settings,
+        hideSensitiveData: true,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    await user.type(screen.getByLabelText('PIN'), '1234')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    await screen.findByRole('button', {
+      name: 'Sensitive values are hidden. Tap to reveal for this session',
+    })
+    expect(screen.queryByText('$2,000.00')).not.toBeInTheDocument()
+  })
+
+  it('prefers device authentication for unlock when configured', async () => {
+    deviceAuthState.supported = true
+    deviceAuthState.authenticateResult = { ok: true, message: null }
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettingsWithDeviceAuth('1234')),
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    expect(await screen.findByRole('button', { name: 'Unlock with device authentication' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Unlock with device authentication' }))
+
+    await waitFor(() => {
+      expect(deviceAuthState.authenticateSpy).toHaveBeenCalled()
+    })
+    expect(await screen.findByText('This month')).toBeInTheDocument()
+  })
+
+  it('keeps PIN fallback available when device authentication is configured', async () => {
+    deviceAuthState.supported = true
+    deviceAuthState.authenticateResult = {
+      ok: false,
+      message: 'Device authentication was cancelled. Use PIN instead.',
+    }
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettingsWithDeviceAuth('1234')),
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    await user.click(screen.getByRole('button', { name: 'Unlock with device authentication' }))
+
+    expect(await screen.findByText('Device authentication was cancelled. Use PIN instead.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Use PIN instead' }))
+    await user.type(screen.getByLabelText('PIN'), '1234')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByText('This month')).toBeInTheDocument()
+  })
+
+  it('does not unlock when the PIN is incorrect', async () => {
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Unlock Tally' })).toBeInTheDocument()
+    await user.type(screen.getByLabelText('PIN'), '9999')
+    await user.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByText('Incorrect PIN.')).toBeInTheDocument()
+    expect(screen.queryByText('This month')).not.toBeInTheDocument()
+  })
+
+  it('does not relock after a short background switch under the timeout', async () => {
+    let mockedNow = new Date('2026-04-22T12:00:00.000Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockedNow)
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    renderWithUser(<App />)
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+
+    fireEvent.change(screen.getByLabelText('PIN'), { target: { value: '1234' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    await screen.findByText('This month')
+
+    setDocumentVisibilityState('hidden')
+    fireEvent(document, new Event('visibilitychange'))
+    mockedNow += APP_LOCK_RELOCK_TIMEOUT_MS - 1_000
+    setDocumentVisibilityState('visible')
+    fireEvent(document, new Event('visibilitychange'))
+
+    expect(screen.queryByRole('heading', { name: 'Unlock Tally' })).not.toBeInTheDocument()
+    expect(screen.getByText('This month')).toBeInTheDocument()
+
+    nowSpy.mockRestore()
+  }, 15000)
+
+  it('relocks after being backgrounded longer than the timeout', async () => {
+    let mockedNow = new Date('2026-04-22T12:00:00.000Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockedNow)
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    renderWithUser(<App />)
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+
+    fireEvent.change(screen.getByLabelText('PIN'), { target: { value: '1234' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    await screen.findByText('This month')
+
+    setDocumentVisibilityState('hidden')
+    fireEvent(document, new Event('visibilitychange'))
+    mockedNow += APP_LOCK_RELOCK_TIMEOUT_MS + 1_000
+    setDocumentVisibilityState('visible')
+    fireEvent(document, new Event('visibilitychange'))
+
+    expect(await screen.findByRole('heading', { name: 'Unlock Tally' })).toBeInTheDocument()
+    expect(screen.queryByText('This month')).not.toBeInTheDocument()
+
+    nowSpy.mockRestore()
+  }, 15000)
+
+  it('applies a short cooldown after repeated incorrect PIN attempts', async () => {
+    let mockedNow = new Date('2026-04-22T12:00:00.000Z').getTime()
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockedNow)
+
+    storageState.loadedState = createLoadedState({
+      settings: {
+        ...createLoadedState().settings,
+        ...(await createLockedSettings('1234')),
+      },
+    })
+
+    renderWithUser(<App />)
+
+    await screen.findByRole('heading', { name: 'Unlock Tally' })
+    const pinInput = screen.getByLabelText('PIN')
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      fireEvent.change(pinInput, { target: { value: '9999' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+
+      expect(await screen.findByText('Incorrect PIN.')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Unlock' })).toBeEnabled()
+      })
+    }
+
+    fireEvent.change(pinInput, { target: { value: '9999' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+
+    expect(await screen.findByText('Too many incorrect attempts. Try again in a moment.')).toBeInTheDocument()
+    expect(await screen.findByText(/Try again in \d+s\./)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unlock' })).toBeDisabled()
+
+    nowSpy.mockRestore()
+  }, 15000)
 
   it('does not show backup reminder immediately after first-run privacy confirmation', async () => {
     storageState.loadedState = createLoadedState({

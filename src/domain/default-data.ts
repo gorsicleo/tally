@@ -96,5 +96,9 @@ export const initialFinanceState: FinanceState = {
     lastReminderAt: null,
     hideOverspendingBudgetsInHome: false,
     hideSensitiveData: false,
+    lockAppOnLaunch: false,
+    appLockPinVerifier: null,
+    deviceAuthCredential: null,
+    recoveryCodeSet: null,
   },
 }

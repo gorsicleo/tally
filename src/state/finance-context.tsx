@@ -23,6 +23,26 @@ import {
 } from '../domain/recurring'
 import type { BackupPreferences, ThemeMode } from '../domain/models'
 import { loadFinanceState, saveFinanceState } from '../persistence/finance-storage'
+import {
+  APP_LOCK_COOLDOWN_AFTER_FAILURES_MS,
+  APP_LOCK_FAILURES_BEFORE_COOLDOWN,
+  APP_LOCK_RELOCK_TIMEOUT_MS,
+  createAppLockPinVerifier,
+  shouldRequireAppLock,
+  validateNumericPin,
+  verifyAppLockPin,
+} from '../features/privacy/app-lock'
+import {
+  authenticateWithDeviceCredential,
+  isDeviceAuthenticationConfigured,
+  isDeviceAuthenticationSupported,
+  registerDeviceAuthenticationCredential,
+} from '../features/privacy/device-auth'
+import {
+  createRecoveryCodeSet,
+  getRecoveryCodeSummary,
+  verifyAndConsumeRecoveryCode,
+} from '../features/privacy/recovery-codes'
 import { shouldHideSensitiveValues } from '../features/privacy/sensitive-data'
 import { createId } from '../utils/id'
 import { financeReducer } from './finance-reducer'
@@ -41,9 +61,20 @@ import {
 export function FinanceProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(financeReducer, initialFinanceState)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isAppUnlocked, setIsAppUnlocked] = useState(false)
+  const [appLockCooldownUntil, setAppLockCooldownUntil] = useState<number | null>(null)
+  const [isDeviceAuthSupported, setIsDeviceAuthSupported] = useState(
+    () => isDeviceAuthenticationSupported(),
+  )
   const [sensitiveDataRevealedForSession, setSensitiveDataRevealedForSession] =
     useState(false)
   const stateRef = useRef(state)
+  const appLockFailedAttemptsRef = useRef(0)
+  const backgroundedAtRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    setIsDeviceAuthSupported(isDeviceAuthenticationSupported())
+  }, [])
 
   useEffect(() => {
     stateRef.current = state
@@ -78,6 +109,18 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       // Routine persistence failures are surfaced on explicit restore actions.
     })
   }, [isLoaded, state])
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return
+    }
+
+    if (!shouldRequireAppLock(state.settings)) {
+      setIsAppUnlocked(true)
+      setAppLockCooldownUntil(null)
+      appLockFailedAttemptsRef.current = 0
+    }
+  }, [isLoaded, state.settings])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -120,6 +163,98 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       media.removeListener(handleChange)
     }
   }, [state.settings.theme])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isLoaded) {
+      return
+    }
+
+    const markBackgrounded = () => {
+      backgroundedAtRef.current = Date.now()
+    }
+
+    const evaluateRelock = () => {
+      if (!shouldRequireAppLock(stateRef.current.settings)) {
+        backgroundedAtRef.current = null
+        return
+      }
+
+      const backgroundedAt = backgroundedAtRef.current
+
+      if (backgroundedAt === null) {
+        return
+      }
+
+      const wasBackgroundedLongEnough =
+        Date.now() - backgroundedAt >= APP_LOCK_RELOCK_TIMEOUT_MS
+
+      backgroundedAtRef.current = null
+
+      if (wasBackgroundedLongEnough) {
+        setSensitiveDataRevealedForSession(false)
+        setIsAppUnlocked(false)
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        markBackgrounded()
+        return
+      }
+
+      if (document.visibilityState === 'visible') {
+        evaluateRelock()
+      }
+    }
+
+    const handlePageHide = () => {
+      markBackgrounded()
+    }
+
+    const handlePageShow = () => {
+      evaluateRelock()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
+    window.addEventListener('pageshow', handlePageShow)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [isLoaded])
+
+  const verifyStoredPin = useCallback(async (pin: string) => {
+    const verifier = stateRef.current.settings.appLockPinVerifier
+
+    if (!verifier) {
+      return 'App lock is not configured.'
+    }
+
+    if (appLockCooldownUntil !== null && Date.now() < appLockCooldownUntil) {
+      return 'Too many incorrect attempts. Try again in a moment.'
+    }
+
+    const isValid = await verifyAppLockPin(pin, verifier)
+
+    if (isValid) {
+      appLockFailedAttemptsRef.current = 0
+      setAppLockCooldownUntil(null)
+      return null
+    }
+
+    appLockFailedAttemptsRef.current += 1
+
+    if (appLockFailedAttemptsRef.current >= APP_LOCK_FAILURES_BEFORE_COOLDOWN) {
+      appLockFailedAttemptsRef.current = 0
+      setAppLockCooldownUntil(Date.now() + APP_LOCK_COOLDOWN_AFTER_FAILURES_MS)
+      return 'Too many incorrect attempts. Try again in a moment.'
+    }
+
+    return 'Incorrect PIN.'
+  }, [appLockCooldownUntil])
 
   const addCategory = useCallback((input: AddCategoryInput) => {
     const timestamp = new Date().toISOString()
@@ -486,6 +621,239 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const setLockAppOnLaunchEnabled = useCallback((enabled: boolean) => {
+    if (enabled && !stateRef.current.settings.appLockPinVerifier) {
+      return
+    }
+
+    dispatch({
+      type: 'update-settings',
+      payload: { lockAppOnLaunch: enabled },
+    })
+
+    if (!enabled) {
+      setAppLockCooldownUntil(null)
+      appLockFailedAttemptsRef.current = 0
+      setIsAppUnlocked(true)
+    }
+  }, [])
+
+  const setupAppLock = useCallback(async (pin: string) => {
+    const validationMessage = validateNumericPin(pin)
+
+    if (validationMessage) {
+      return validationMessage
+    }
+
+    const verifier = await createAppLockPinVerifier(pin)
+    setAppLockCooldownUntil(null)
+    appLockFailedAttemptsRef.current = 0
+    setIsAppUnlocked(true)
+    dispatch({
+      type: 'update-settings',
+      payload: {
+        lockAppOnLaunch: true,
+        appLockPinVerifier: verifier,
+      },
+    })
+
+    return null
+  }, [])
+
+  const changeAppLockPin = useCallback(async (currentPin: string, nextPin: string) => {
+    const validationMessage = validateNumericPin(nextPin)
+
+    if (validationMessage) {
+      return validationMessage
+    }
+
+    const verificationMessage = await verifyStoredPin(currentPin)
+
+    if (verificationMessage) {
+      return verificationMessage === 'Incorrect PIN.'
+        ? 'Current PIN is incorrect.'
+        : verificationMessage
+    }
+
+    const verifier = await createAppLockPinVerifier(nextPin)
+    dispatch({
+      type: 'update-settings',
+      payload: {
+        lockAppOnLaunch: true,
+        appLockPinVerifier: verifier,
+      },
+    })
+
+    return null
+  }, [verifyStoredPin])
+
+  const removeAppLock = useCallback(async (pin: string) => {
+    const verificationMessage = await verifyStoredPin(pin)
+
+    if (verificationMessage) {
+      return verificationMessage === 'Incorrect PIN.'
+        ? 'Current PIN is incorrect.'
+        : verificationMessage
+    }
+
+    setAppLockCooldownUntil(null)
+    appLockFailedAttemptsRef.current = 0
+    backgroundedAtRef.current = null
+    setSensitiveDataRevealedForSession(false)
+    setIsAppUnlocked(true)
+    dispatch({
+      type: 'update-settings',
+      payload: {
+        lockAppOnLaunch: false,
+        appLockPinVerifier: null,
+        deviceAuthCredential: null,
+        recoveryCodeSet: null,
+      },
+    })
+
+    return null
+  }, [verifyStoredPin])
+
+  const unlockApp = useCallback(async (pin: string) => {
+    if (!shouldRequireAppLock(stateRef.current.settings)) {
+      setIsAppUnlocked(true)
+      return null
+    }
+
+    const verificationMessage = await verifyStoredPin(pin)
+
+    if (verificationMessage) {
+      return verificationMessage
+    }
+
+    backgroundedAtRef.current = null
+    setIsAppUnlocked(true)
+    return null
+  }, [verifyStoredPin])
+
+  const setupDeviceAuthentication = useCallback(async () => {
+    if (!stateRef.current.settings.appLockPinVerifier) {
+      return 'Set up a PIN before enabling device authentication.'
+    }
+
+    if (!isDeviceAuthenticationSupported()) {
+      return 'Device authentication is not available on this device.'
+    }
+
+    try {
+      const credential = await registerDeviceAuthenticationCredential()
+
+      dispatch({
+        type: 'update-settings',
+        payload: {
+          deviceAuthCredential: credential,
+        },
+      })
+
+      return null
+    } catch (error) {
+      if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message
+      }
+
+      return 'Could not enable device authentication.'
+    }
+  }, [])
+
+  const removeDeviceAuthentication = useCallback(() => {
+    dispatch({
+      type: 'update-settings',
+      payload: {
+        deviceAuthCredential: null,
+      },
+    })
+  }, [])
+
+  const unlockAppWithDeviceAuthentication = useCallback(async () => {
+    if (!shouldRequireAppLock(stateRef.current.settings)) {
+      setIsAppUnlocked(true)
+      return null
+    }
+
+    const result = await authenticateWithDeviceCredential(
+      stateRef.current.settings.deviceAuthCredential,
+    )
+
+    if (!result.ok) {
+      return result.message ?? 'Device authentication failed. Use PIN instead.'
+    }
+
+    appLockFailedAttemptsRef.current = 0
+    setAppLockCooldownUntil(null)
+    backgroundedAtRef.current = null
+    setIsAppUnlocked(true)
+
+    return null
+  }, [])
+
+  const generateRecoveryCodes = useCallback(async (currentPin: string | null) => {
+    if (!stateRef.current.settings.appLockPinVerifier) {
+      return 'Set up app lock with a PIN first.'
+    }
+
+    const hasExistingCodes = stateRef.current.settings.recoveryCodeSet !== null
+
+    if (hasExistingCodes) {
+      if (!currentPin || currentPin.length === 0) {
+        return 'Enter your current PIN to regenerate recovery codes.'
+      }
+
+      const verificationMessage = await verifyStoredPin(currentPin)
+
+      if (verificationMessage) {
+        return verificationMessage === 'Incorrect PIN.'
+          ? 'Current PIN is incorrect.'
+          : verificationMessage
+      }
+    }
+
+    try {
+      const { plaintextCodes, codeSet } = await createRecoveryCodeSet()
+
+      dispatch({
+        type: 'update-settings',
+        payload: {
+          recoveryCodeSet: codeSet,
+        },
+      })
+
+      return plaintextCodes
+    } catch {
+      return 'Could not generate recovery codes.'
+    }
+  }, [verifyStoredPin])
+
+  const unlockAppWithRecoveryCode = useCallback(async (code: string) => {
+    if (!shouldRequireAppLock(stateRef.current.settings)) {
+      setIsAppUnlocked(true)
+      return null
+    }
+
+    const result = await verifyAndConsumeRecoveryCode(code, stateRef.current.settings.recoveryCodeSet)
+
+    if (!result.ok || !result.nextSet) {
+      return result.message ?? 'Recovery code is invalid or already used.'
+    }
+
+    appLockFailedAttemptsRef.current = 0
+    setAppLockCooldownUntil(null)
+    backgroundedAtRef.current = null
+    setIsAppUnlocked(true)
+    dispatch({
+      type: 'update-settings',
+      payload: {
+        recoveryCodeSet: result.nextSet,
+      },
+    })
+
+    return null
+  }, [])
+
   const setHideOverspendingBudgetsInHome = useCallback((hidden: boolean) => {
     dispatch({
       type: 'update-settings',
@@ -500,9 +868,24 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     [],
   )
 
-  const revealSensitiveDataForSession = useCallback(() => {
+  const revealSensitiveDataForSession = useCallback(async () => {
+    if (sensitiveDataRevealedForSession) {
+      return null
+    }
+
+    if (isDeviceAuthenticationConfigured(stateRef.current.settings.deviceAuthCredential)) {
+      const result = await authenticateWithDeviceCredential(
+        stateRef.current.settings.deviceAuthCredential,
+      )
+
+      if (!result.ok) {
+        return result.message ?? 'Device authentication failed. Sensitive values remain hidden.'
+      }
+    }
+
     setSensitiveDataRevealedForSession(true)
-  }, [])
+    return null
+  }, [sensitiveDataRevealedForSession])
 
   const shouldHideSensitiveValuesNow = useMemo(
     () =>
@@ -516,8 +899,18 @@ export function FinanceProvider({ children }: PropsWithChildren) {
   const replaceState = useCallback(async (nextState: typeof state) => {
     await saveFinanceState(nextState)
     stateRef.current = nextState
+    setSensitiveDataRevealedForSession(false)
+    setAppLockCooldownUntil(null)
+    appLockFailedAttemptsRef.current = 0
+    backgroundedAtRef.current = null
+    setIsAppUnlocked(!shouldRequireAppLock(nextState.settings))
     dispatch({ type: 'replace-state', payload: nextState })
   }, [])
+
+  const recoverySummary = useMemo(
+    () => getRecoveryCodeSummary(state.settings.recoveryCodeSet),
+    [state.settings.recoveryCodeSet],
+  )
 
   const value = useMemo(
     () => ({
@@ -540,7 +933,23 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       setTheme,
       setCurrency,
       setHideSensitiveData,
+      setLockAppOnLaunchEnabled,
+      setupAppLock,
+      changeAppLockPin,
+      removeAppLock,
+      unlockApp,
+      setupDeviceAuthentication,
+      removeDeviceAuthentication,
+      unlockAppWithDeviceAuthentication,
+      generateRecoveryCodes,
+      unlockAppWithRecoveryCode,
       setHideOverspendingBudgetsInHome,
+      isAppUnlocked,
+      appLockCooldownUntil,
+      isDeviceAuthSupported,
+      isDeviceAuthConfigured: isDeviceAuthenticationConfigured(state.settings.deviceAuthCredential),
+      isRecoveryCodesConfigured: recoverySummary.total > 0,
+      recoveryCodesRemaining: recoverySummary.remaining,
       sensitiveDataRevealedForSession,
       shouldHideSensitiveValues: shouldHideSensitiveValuesNow,
       revealSensitiveDataForSession,
@@ -567,7 +976,22 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       setTheme,
       setCurrency,
       setHideSensitiveData,
+      setLockAppOnLaunchEnabled,
+      setupAppLock,
+      changeAppLockPin,
+      removeAppLock,
+      unlockApp,
+      setupDeviceAuthentication,
+      removeDeviceAuthentication,
+      unlockAppWithDeviceAuthentication,
+      generateRecoveryCodes,
+      unlockAppWithRecoveryCode,
       setHideOverspendingBudgetsInHome,
+      isAppUnlocked,
+      appLockCooldownUntil,
+      isDeviceAuthSupported,
+      recoverySummary.remaining,
+      recoverySummary.total,
       sensitiveDataRevealedForSession,
       shouldHideSensitiveValuesNow,
       revealSensitiveDataForSession,
