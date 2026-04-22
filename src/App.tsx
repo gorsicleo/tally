@@ -50,7 +50,7 @@ function FinanceWorkspace() {
     isDeviceAuthSupported,
     isDeviceAuthConfigured,
     unlockAppWithDeviceAuthentication,
-    isRecoveryCodesConfigured,
+    recoveryCodesRemaining,
     unlockAppWithRecoveryCode,
     sensitiveDataRevealedForSession,
     revealSensitiveDataForSession,
@@ -285,7 +285,7 @@ function FinanceWorkspace() {
         <AppLockGate
           cooldownUntil={appLockCooldownUntil}
           canUseDeviceAuthentication={isDeviceAuthSupported && isDeviceAuthConfigured}
-          canUseRecoveryCodes={isRecoveryCodesConfigured}
+          canUseRecoveryCodes={recoveryCodesRemaining > 0}
           onUnlock={unlockApp}
           onUnlockWithDeviceAuthentication={unlockAppWithDeviceAuthentication}
           onUnlockWithRecoveryCode={unlockAppWithRecoveryCode}

@@ -40,6 +40,12 @@ const legacyBackupPreferenceDefaults = {
   recoveryCodeSet: null,
 } as const
 
+const APP_LOCK_PIN_VERIFIER_ITERATIONS = 200_000
+const APP_LOCK_PIN_SALT_HEX_LENGTH = 32
+const APP_LOCK_PIN_VERIFIER_HEX_LENGTH = 64
+const RECOVERY_CODE_SALT_HEX_LENGTH = 32
+const RECOVERY_CODE_VERIFIER_HEX_LENGTH = 64
+
 interface ParsedBudgetCandidate {
   id: string
   createdAt: string
@@ -75,6 +81,10 @@ function isHexString(value: unknown): value is string {
   return isString(value) && /^[0-9a-f]+$/i.test(value) && value.length > 0
 }
 
+function isHexStringWithLength(value: unknown, expectedLength: number): value is string {
+  return isHexString(value) && value.length === expectedLength
+}
+
 function isBase64UrlString(value: unknown): value is string {
   return isString(value) && /^[A-Za-z0-9_-]+$/.test(value) && value.length > 0
 }
@@ -96,7 +106,7 @@ function parseRecoveryCodeVerifier(value: unknown): RecoveryCodeVerifier | null 
 
   if (
     !isString(value.id) ||
-    !isHexString(value.verifierHex) ||
+    !isHexStringWithLength(value.verifierHex, RECOVERY_CODE_VERIFIER_HEX_LENGTH) ||
     !(value.usedAt === null || isString(value.usedAt))
   ) {
     return null
@@ -409,9 +419,9 @@ function parseAppLockPinVerifier(value: unknown): AppLockPinVerifier | null {
     value.algorithm !== 'PBKDF2' ||
     value.hash !== 'SHA-256' ||
     !isNonNegativeNumber(value.iterations) ||
-    value.iterations < 1 ||
-    !isHexString(value.saltHex) ||
-    !isHexString(value.verifierHex)
+    value.iterations !== APP_LOCK_PIN_VERIFIER_ITERATIONS ||
+    !isHexStringWithLength(value.saltHex, APP_LOCK_PIN_SALT_HEX_LENGTH) ||
+    !isHexStringWithLength(value.verifierHex, APP_LOCK_PIN_VERIFIER_HEX_LENGTH)
   ) {
     return null
   }
@@ -468,20 +478,25 @@ function parseRecoveryCodeSet(value: unknown): RecoveryCodeSet | null {
   if (
     value.version !== 1 ||
     value.hash !== 'SHA-256' ||
-    !isHexString(value.saltHex) ||
+    !isHexStringWithLength(value.saltHex, RECOVERY_CODE_SALT_HEX_LENGTH) ||
     !isString(value.generatedAt) ||
     !Array.isArray(value.verifiers)
   ) {
     return null
   }
 
-  const verifiers = value.verifiers
-    .map((verifier) => parseRecoveryCodeVerifier(verifier))
-    .filter((verifier): verifier is RecoveryCodeVerifier => verifier !== null)
-
-  if (verifiers.length === 0) {
+  if (value.verifiers.length === 0) {
     return null
   }
+
+  const parsedVerifiers = value.verifiers
+    .map((verifier) => parseRecoveryCodeVerifier(verifier))
+
+  if (parsedVerifiers.some((verifier) => verifier === null)) {
+    return null
+  }
+
+  const verifiers = parsedVerifiers as RecoveryCodeVerifier[]
 
   return {
     version: 1,
