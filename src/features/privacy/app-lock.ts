@@ -37,7 +37,6 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   new Uint8Array(buffer).set(bytes)
   return buffer
 }
-
 function isValidPinInput(pin: string): boolean {
   return /^\d+$/.test(pin) && pin.length >= APP_LOCK_PIN_MIN_LENGTH
 }
