@@ -19,7 +19,7 @@ export interface DeviceAuthCredential {
   version: 1
   credentialId: string
   createdAt: string
-  transports?: DeviceAuthTransport[]
+  transports?: readonly DeviceAuthTransport[]
 }
 
 export interface RecoveryCodeVerifier {

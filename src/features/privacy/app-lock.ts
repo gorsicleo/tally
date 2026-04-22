@@ -32,6 +32,11 @@ function hexToBytes(value: string): Uint8Array {
   return bytes
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(buffer).set(bytes)
+  return buffer
+}
 function isValidPinInput(pin: string): boolean {
   return /^\d+$/.test(pin) && pin.length >= APP_LOCK_PIN_MIN_LENGTH
 }
@@ -52,7 +57,7 @@ async function derivePinVerifierHex(
   const derivedBits = await getWebCrypto().subtle.deriveBits(
     {
       name: 'PBKDF2',
-      salt,
+      salt: toArrayBuffer(salt),
       iterations,
       hash: 'SHA-256',
     },
