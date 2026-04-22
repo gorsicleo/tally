@@ -31,6 +31,7 @@ import { ReportBugDialog } from './report-bug-dialog'
 import { SettingsBackupSection } from './settings-backup-section'
 import { SettingsCategoriesSection } from './settings-categories-section'
 import { SettingsGeneralSection } from './settings-general-section'
+import { SettingsPrivacySection } from './settings-privacy-section'
 import { SettingsRecurringSection } from './settings-recurring-section'
 
 const currencyOptions = ['USD', 'EUR', 'GBP', 'CZK']
@@ -331,7 +332,9 @@ export function SettingsScreen({
     deleteCategory,
     setTheme,
     setCurrency,
+    setHideSensitiveData,
     setHideOverspendingBudgetsInHome,
+    shouldHideSensitiveValues,
     updateBackupSettings,
     replaceState,
   } = useFinance()
@@ -718,6 +721,13 @@ export function SettingsScreen({
             }}
           />
 
+          <SettingsPrivacySection
+            hideSensitiveData={state.settings.hideSensitiveData ?? false}
+            onHideSensitiveDataChange={(hidden) => {
+              setHideSensitiveData(hidden)
+            }}
+          />
+
           <SettingsBackupSection
             lastBackupLabel={formatDateTimeLabel(state.settings.lastBackupAt)}
             backupRemindersEnabled={state.settings.backupRemindersEnabled}
@@ -857,6 +867,7 @@ export function SettingsScreen({
           activeRecurringTemplates={activeRecurringTemplates}
           categories={state.categories}
           currency={state.settings.currency}
+          hideSensitiveValues={shouldHideSensitiveValues}
           onBack={() => setView('main')}
           onOpenRecurringEditor={onOpenRecurringEditor}
         />

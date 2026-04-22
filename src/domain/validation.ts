@@ -28,6 +28,7 @@ const legacyBackupPreferenceDefaults = {
   changesSinceBackup: 0,
   lastReminderAt: null,
   hideOverspendingBudgetsInHome: false,
+  hideSensitiveData: false,
 } as const
 
 interface ParsedBudgetCandidate {
@@ -367,7 +368,8 @@ function isAppSettings(value: unknown): value is AppSettings {
     isNonNegativeNumber(value.changesSinceBackup) &&
     (value.lastReminderAt === null || isString(value.lastReminderAt)) &&
     (value.hideOverspendingBudgetsInHome === undefined ||
-      typeof value.hideOverspendingBudgetsInHome === 'boolean')
+      typeof value.hideOverspendingBudgetsInHome === 'boolean') &&
+    (value.hideSensitiveData === undefined || typeof value.hideSensitiveData === 'boolean')
   )
 }
 
@@ -428,12 +430,19 @@ function parseAppSettings(
       : useLegacyBackupDefaults
         ? legacyBackupPreferenceDefaults.hideOverspendingBudgetsInHome
         : null
+  const hideSensitiveData =
+    typeof value.hideSensitiveData === 'boolean'
+      ? value.hideSensitiveData
+      : useLegacyBackupDefaults
+        ? legacyBackupPreferenceDefaults.hideSensitiveData
+        : null
 
   if (
     hasSeenPrivacyModal === null ||
     backupRemindersEnabled === null ||
     changesSinceBackup === null ||
-    hideOverspendingBudgetsInHome === null
+    hideOverspendingBudgetsInHome === null ||
+    hideSensitiveData === null
   ) {
     return null
   }
@@ -448,6 +457,7 @@ function parseAppSettings(
     changesSinceBackup,
     lastReminderAt,
     hideOverspendingBudgetsInHome,
+    hideSensitiveData,
   }
 }
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatCurrency, formatMonthLabel } from '../../domain/formatters'
+import { formatMonthLabel } from '../../domain/formatters'
 import {
   getCategoryTotalsForMonthKeys,
   getMonthKey,
@@ -8,6 +8,7 @@ import {
   shiftMonthKey,
 } from '../../domain/selectors'
 import { useFinance } from '../../state/use-finance'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 import {
   InsightsCategoryDonutChart,
   InsightsTrendChart,
@@ -36,16 +37,20 @@ function getPeriodDayCount(range: InsightRange): number {
   return Math.max(1, Math.floor(diffInMs / 86_400_000) + 1)
 }
 
-function formatSignedCurrency(value: number, currency: string): string {
+function formatSignedSensitiveCurrency(
+  value: number,
+  currency: string,
+  hideSensitiveValues: boolean,
+): string {
   if (value > 0) {
-    return `+${formatCurrency(value, currency)}`
+    return `+${formatSensitiveCurrency(value, currency, hideSensitiveValues)}`
   }
 
-  return formatCurrency(value, currency)
+  return formatSensitiveCurrency(value, currency, hideSensitiveValues)
 }
 
 export function InsightsScreen() {
-  const { state } = useFinance()
+  const { state, shouldHideSensitiveValues } = useFinance()
   const monthKey = useMemo(() => getMonthKey(), [])
   const [range, setRange] = useState<InsightRange>('month')
   const [view, setView] = useState<InsightView>('bars')
@@ -163,7 +168,7 @@ export function InsightsScreen() {
             {range === 'month' ? formatMonthLabel(monthKey) : summaryLabel}
           </span>
           <strong className="insights-hero-value">
-            {formatCurrency(currentOverview.expense, currency)}
+            {formatSensitiveCurrency(currentOverview.expense, currency, shouldHideSensitiveValues)}
           </strong>
           <p>{summaryLabel}</p>
         </div>
@@ -172,13 +177,23 @@ export function InsightsScreen() {
           <article className="insight-stat-card">
             <span>{comparisonLabel}</span>
             <strong className={deltaExpense > 0 ? 'expense' : deltaExpense < 0 ? 'income' : ''}>
-              {formatSignedCurrency(deltaExpense, currency)}
+              {formatSignedSensitiveCurrency(
+                deltaExpense,
+                currency,
+                shouldHideSensitiveValues,
+              )}
             </strong>
           </article>
 
           <article className="insight-stat-card">
             <span>Average daily</span>
-            <strong>{formatCurrency(averageDailySpend, currency)}</strong>
+            <strong>
+              {formatSensitiveCurrency(
+                averageDailySpend,
+                currency,
+                shouldHideSensitiveValues,
+              )}
+            </strong>
           </article>
         </div>
       </section>
@@ -211,7 +226,11 @@ export function InsightsScreen() {
                   </div>
 
                   <strong className="insights-trend-amount">
-                    {formatCurrency(entry.expense, currency)}
+                    {formatSensitiveCurrency(
+                      entry.expense,
+                      currency,
+                      shouldHideSensitiveValues,
+                    )}
                   </strong>
                 </div>
               ))}
@@ -221,6 +240,7 @@ export function InsightsScreen() {
               trend={trend}
               currency={currency}
               currentMonthKey={monthKey}
+              hideSensitiveValues={shouldHideSensitiveValues}
             />
           ) : (
             <p className="empty-state">Add a few expense records to reveal your trend.</p>
@@ -254,7 +274,13 @@ export function InsightsScreen() {
                 <div className="insights-category-row" key={entry.categoryId}>
                   <div className="insights-category-head">
                     <span>{entry.name}</span>
-                    <strong>{formatCurrency(entry.total, currency)}</strong>
+                    <strong>
+                      {formatSensitiveCurrency(
+                        entry.total,
+                        currency,
+                        shouldHideSensitiveValues,
+                      )}
+                    </strong>
                   </div>
 
                   <div className="insights-category-bar" aria-hidden="true">
@@ -273,6 +299,7 @@ export function InsightsScreen() {
               categories={categoryTotals}
               total={currentOverview.expense}
               currency={currency}
+              hideSensitiveValues={shouldHideSensitiveValues}
             />
           ) : (
             <p className="empty-state">Your spending mix will appear after a few expense records.</p>

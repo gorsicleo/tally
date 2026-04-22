@@ -92,7 +92,11 @@ export interface FinanceContextValue {
   removeBudget: (budgetId: string) => void
   setTheme: (theme: ThemeMode) => void
   setCurrency: (currency: string) => void
+  setHideSensitiveData: (hidden: boolean) => void
   setHideOverspendingBudgetsInHome: (hidden: boolean) => void
+  sensitiveDataRevealedForSession: boolean
+  shouldHideSensitiveValues: boolean
+  revealSensitiveDataForSession: () => void
   updateBackupSettings: (settings: Partial<BackupPreferences>) => void
   replaceState: (nextState: FinanceState) => Promise<void>
 }

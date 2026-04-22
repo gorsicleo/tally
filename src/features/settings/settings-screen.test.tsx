@@ -138,6 +138,27 @@ describe('SettingsScreen direct flows', () => {
     expect(setHideOverspendingBudgetsInHome).toHaveBeenCalledWith(false)
   })
 
+  it('toggles hide sensitive data preference in privacy settings', async () => {
+    const setHideSensitiveData = vi.fn()
+    const { user } = renderScreen(createState(), {
+      setHideSensitiveData,
+    })
+
+    const rowElement = screen
+      .getByText('Hide sensitive data')
+      .closest('.settings-list-row')
+
+    if (!(rowElement instanceof HTMLElement)) {
+      throw new Error('Expected hide sensitive data toggle row to be rendered.')
+    }
+
+    await user.click(within(rowElement).getByRole('button', { name: 'On' }))
+    expect(setHideSensitiveData).toHaveBeenCalledWith(true)
+
+    await user.click(within(rowElement).getByRole('button', { name: 'Off' }))
+    expect(setHideSensitiveData).toHaveBeenCalledWith(false)
+  })
+
   it('opens and closes report bug dialog from settings', async () => {
     const { user } = renderScreen(createState())
 

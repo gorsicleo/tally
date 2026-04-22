@@ -1,6 +1,7 @@
 import { useId, useMemo } from 'react'
-import { formatCurrency, formatMonthLabel } from '../../domain/formatters'
+import { formatMonthLabel } from '../../domain/formatters'
 import type { CategoryTotal, MonthlyTrendPoint } from '../../domain/selectors'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 
 const LINE_CHART_WIDTH = 320
 const LINE_CHART_HEIGHT = 148
@@ -38,12 +39,14 @@ interface InsightsTrendChartProps {
   trend: MonthlyTrendPoint[]
   currency: string
   currentMonthKey: string
+  hideSensitiveValues: boolean
 }
 
 interface InsightsCategoryDonutChartProps {
   categories: CategoryTotal[]
   total: number
   currency: string
+  hideSensitiveValues: boolean
 }
 
 function buildTrendPoints(trend: MonthlyTrendPoint[]): TrendPoint[] {
@@ -172,6 +175,7 @@ export function InsightsTrendChart({
   trend,
   currency,
   currentMonthKey,
+  hideSensitiveValues,
 }: InsightsTrendChartProps) {
   const strokeGradientId = useId().replaceAll(':', '')
   const fillGradientId = useId().replaceAll(':', '')
@@ -271,7 +275,9 @@ export function InsightsTrendChart({
         <div className="insights-chart-caption-item">
           <span>Latest</span>
           <strong className={`insights-chart-caption-value ${latestDelta > 0 ? 'up' : latestDelta < 0 ? 'down' : 'flat'}`.trim()}>
-            {latestPoint ? `${formatCurrency(latestPoint.value, currency)} ${getDirectionSymbol(latestDelta)}` : '—'}
+            {latestPoint
+              ? `${formatSensitiveCurrency(latestPoint.value, currency, hideSensitiveValues)} ${getDirectionSymbol(latestDelta)}`
+              : '—'}
           </strong>
         </div>
 
@@ -290,6 +296,7 @@ export function InsightsCategoryDonutChart({
   categories,
   total,
   currency,
+  hideSensitiveValues,
 }: InsightsCategoryDonutChartProps) {
   const slices = useMemo(() => buildDonutSlices(categories, total), [categories, total])
   const radius = (DONUT_SIZE - DONUT_STROKE_WIDTH) / 2
@@ -356,7 +363,9 @@ export function InsightsCategoryDonutChart({
         </svg>
 
         <div className="insights-donut-center" aria-hidden="true">
-          <strong className="insights-donut-total">{formatCurrency(total, currency)}</strong>
+          <strong className="insights-donut-total">
+            {formatSensitiveCurrency(total, currency, hideSensitiveValues)}
+          </strong>
           <span className="insights-donut-label">Total</span>
         </div>
       </div>
@@ -378,7 +387,7 @@ export function InsightsCategoryDonutChart({
               </div>
             </div>
 
-            <strong>{formatCurrency(slice.total, currency)}</strong>
+            <strong>{formatSensitiveCurrency(slice.total, currency, hideSensitiveValues)}</strong>
           </div>
         ))}
       </div>

@@ -95,5 +95,6 @@ export const initialFinanceState: FinanceState = {
     changesSinceBackup: 0,
     lastReminderAt: null,
     hideOverspendingBudgetsInHome: false,
+    hideSensitiveData: false,
   },
 }

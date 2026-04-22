@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import {
-  formatCurrency,
   formatLongDateLabel,
 } from '../../domain/formatters'
 import { getDueRecurringGroups } from '../../domain/recurring'
 import { useFinance } from '../../state/use-finance'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 
 interface RecurringDueSectionProps {
   currency: string
@@ -22,6 +22,7 @@ export function RecurringDueSection({
     addRecurringOccurrences,
     skipRecurringOccurrences,
     stopRecurringTemplate,
+    shouldHideSensitiveValues,
   } = useFinance()
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null)
   const dueGroups = useMemo(
@@ -56,7 +57,12 @@ export function RecurringDueSection({
               <div className="recurring-due-card-head">
                 <div>
                   <strong>
-                    {group.title} {formatCurrency(group.template.amount, currency)}
+                    {group.title}{' '}
+                    {formatSensitiveCurrency(
+                      group.template.amount,
+                      currency,
+                      shouldHideSensitiveValues,
+                    )}
                   </strong>
                   <p>
                     {group.frequencyLabel} · {dueCount} due

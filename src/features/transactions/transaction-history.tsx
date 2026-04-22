@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
 import {
   formatCompactDateLabel,
-  formatCurrency,
   formatLongDateLabel,
 } from '../../domain/formatters'
 import type { Category, Transaction } from '../../domain/models'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 import { getTodayLocalDate, shiftLocalDateKey } from '../../utils/date'
 
 interface TransactionHistoryProps {
@@ -13,6 +13,7 @@ interface TransactionHistoryProps {
   categories: Category[]
   transactions: Transaction[]
   currency: string
+  hideSensitiveValues?: boolean
   emptyMessage?: string
   onEdit: (transaction: Transaction) => void
 }
@@ -44,6 +45,7 @@ export function TransactionHistory({
   categories,
   transactions,
   currency,
+  hideSensitiveValues = false,
   emptyMessage,
   onEdit,
 }: TransactionHistoryProps) {
@@ -134,7 +136,11 @@ export function TransactionHistory({
                   <div className="transaction-tail">
                     <p className={`transaction-amount ${transaction.type}`}>
                       {isExpense ? '-' : '+'}
-                      {formatCurrency(transaction.amount, currency)}
+                      {formatSensitiveCurrency(
+                        transaction.amount,
+                        currency,
+                        hideSensitiveValues,
+                      )}
                     </p>
                   </div>
                 </li>

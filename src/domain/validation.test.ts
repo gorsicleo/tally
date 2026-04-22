@@ -45,6 +45,7 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState?.settings.changesSinceBackup).toBe(0)
     expect(parsedState?.settings.lastReminderAt).toBeNull()
     expect(parsedState?.settings.hideOverspendingBudgetsInHome).toBe(false)
+    expect(parsedState?.settings.hideSensitiveData).toBe(false)
     expect(parsedState?.recurringTemplates).toEqual([])
     expect(parsedState?.transactions[0].recurringTemplateId).toBeNull()
     expect(parsedState?.transactions[0].recurringOccurrenceDate).toBeNull()

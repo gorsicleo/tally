@@ -11,6 +11,7 @@ import {
   BackupReminderCard,
   PrivacyFirstModal,
 } from './features/backup/backup-ui'
+import { SensitiveDataRevealChip } from './features/privacy/sensitive-data-reveal-chip'
 import { UpdateManager } from './features/backup/update-manager'
 import { useInstallPrompt } from './pwa/register-service-worker'
 import { AppHeader } from './features/shell/app-header'
@@ -41,6 +42,8 @@ function FinanceWorkspace() {
     deleteTransaction,
     stopRecurringTemplate,
     updateBackupSettings,
+    sensitiveDataRevealedForSession,
+    revealSensitiveDataForSession,
   } = useFinance()
   const { canInstall, install, isInstalled } = useInstallPrompt()
   const [activeTab, setActiveTab] = useState<AppTab>('home')
@@ -270,6 +273,13 @@ function FinanceWorkspace() {
         key={activeTab}
         title={activeMeta.title}
       />
+
+      {state.settings.hideSensitiveData ? (
+        <SensitiveDataRevealChip
+          isRevealedForSession={sensitiveDataRevealedForSession}
+          onReveal={revealSensitiveDataForSession}
+        />
+      ) : null}
 
       <main className="app-main">
         {isLoaded ? <UpdateManager onCreateBackup={() => createBackup()} /> : null}

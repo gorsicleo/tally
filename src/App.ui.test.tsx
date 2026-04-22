@@ -308,6 +308,134 @@ describe('App UI behavior', () => {
     expect(screen.getByText('$125.00')).toBeInTheDocument()
   })
 
+  it('hides exact values and shows reveal chip when hide sensitive data is enabled', async () => {
+    storageState.loadedState = createLoadedState({
+      transactions: [
+        createTransaction({
+          id: 'txn-income-hidden',
+          type: 'income',
+          amount: 2000,
+          categoryId: 'cat-salary',
+          note: 'Salary',
+        }),
+        createTransaction({
+          id: 'txn-expense-hidden',
+          type: 'expense',
+          amount: 125,
+          categoryId: 'cat-food',
+          note: 'Groceries',
+        }),
+      ],
+      settings: {
+        ...createLoadedState().settings,
+        hideSensitiveData: true,
+      },
+    })
+
+    renderWithUser(<App />)
+
+    await screen.findByText('This month')
+    expect(
+      screen.getByRole('button', {
+        name: 'Sensitive values are hidden. Tap to reveal for this session',
+      }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('$2,000.00')).not.toBeInTheDocument()
+    expect(screen.queryByText('$125.00')).not.toBeInTheDocument()
+    expect(screen.getAllByText('••••').length).toBeGreaterThan(0)
+  })
+
+  it('reveals hidden values for the active session only', async () => {
+    storageState.loadedState = createLoadedState({
+      transactions: [
+        createTransaction({
+          id: 'txn-income-reveal',
+          type: 'income',
+          amount: 2000,
+          categoryId: 'cat-salary',
+          note: 'Salary',
+        }),
+        createTransaction({
+          id: 'txn-expense-reveal',
+          type: 'expense',
+          amount: 125,
+          categoryId: 'cat-food',
+          note: 'Groceries',
+        }),
+      ],
+      settings: {
+        ...createLoadedState().settings,
+        hideSensitiveData: true,
+      },
+    })
+
+    const firstRender = renderWithUser(<App />)
+
+    await screen.findByRole('button', {
+      name: 'Sensitive values are hidden. Tap to reveal for this session',
+    })
+    await firstRender.user.click(
+      screen.getByRole('button', {
+        name: 'Sensitive values are hidden. Tap to reveal for this session',
+      }),
+    )
+
+    expect(await screen.findByText('$2,000.00')).toBeInTheDocument()
+    expect(await screen.findByText('$125.00')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', {
+        name: 'Sensitive values are visible for this session',
+      }),
+    ).toBeInTheDocument()
+
+    firstRender.unmount()
+
+    renderWithUser(<App />)
+
+    await screen.findByRole('button', {
+      name: 'Sensitive values are hidden. Tap to reveal for this session',
+    })
+    expect(screen.queryByText('$2,000.00')).not.toBeInTheDocument()
+    expect(screen.queryByText('$125.00')).not.toBeInTheDocument()
+  })
+
+  it('masks insights numeric labels while keeping charts visible when hide mode is enabled', async () => {
+    storageState.loadedState = createLoadedState({
+      transactions: [
+        createTransaction({
+          id: 'txn-insights-a',
+          type: 'expense',
+          amount: 120,
+          categoryId: 'cat-food',
+          note: 'Meals',
+          occurredAt: createFixtureDate(0),
+        }),
+        createTransaction({
+          id: 'txn-insights-b',
+          type: 'expense',
+          amount: 80,
+          categoryId: 'cat-transport',
+          note: 'Transit',
+          occurredAt: createFixtureDate(-2),
+        }),
+      ],
+      settings: {
+        ...createLoadedState().settings,
+        hideSensitiveData: true,
+      },
+    })
+
+    const { user } = renderWithUser(<App />)
+
+    await screen.findByRole('button', { name: 'Insights' })
+    await user.click(screen.getByRole('button', { name: 'Insights' }))
+
+    expect(await screen.findByText('Monthly spending')).toBeInTheDocument()
+    expect(screen.queryByText('$120.00')).not.toBeInTheDocument()
+    expect(screen.queryByText('$80.00')).not.toBeInTheDocument()
+    expect(screen.getAllByText('••••').length).toBeGreaterThan(0)
+  })
+
   it('does not show backup reminder immediately after first-run privacy confirmation', async () => {
     storageState.loadedState = createLoadedState({
       settings: {

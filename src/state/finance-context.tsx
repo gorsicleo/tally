@@ -23,6 +23,7 @@ import {
 } from '../domain/recurring'
 import type { BackupPreferences, ThemeMode } from '../domain/models'
 import { loadFinanceState, saveFinanceState } from '../persistence/finance-storage'
+import { shouldHideSensitiveValues } from '../features/privacy/sensitive-data'
 import { createId } from '../utils/id'
 import { financeReducer } from './finance-reducer'
 import {
@@ -40,6 +41,8 @@ import {
 export function FinanceProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(financeReducer, initialFinanceState)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [sensitiveDataRevealedForSession, setSensitiveDataRevealedForSession] =
+    useState(false)
   const stateRef = useRef(state)
 
   useEffect(() => {
@@ -475,6 +478,14 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     })
   }, [])
 
+  const setHideSensitiveData = useCallback((hidden: boolean) => {
+    setSensitiveDataRevealedForSession(false)
+    dispatch({
+      type: 'update-settings',
+      payload: { hideSensitiveData: hidden },
+    })
+  }, [])
+
   const setHideOverspendingBudgetsInHome = useCallback((hidden: boolean) => {
     dispatch({
       type: 'update-settings',
@@ -487,6 +498,19 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       dispatch({ type: 'update-settings', payload: settings })
     },
     [],
+  )
+
+  const revealSensitiveDataForSession = useCallback(() => {
+    setSensitiveDataRevealedForSession(true)
+  }, [])
+
+  const shouldHideSensitiveValuesNow = useMemo(
+    () =>
+      shouldHideSensitiveValues(
+        state.settings.hideSensitiveData,
+        sensitiveDataRevealedForSession,
+      ),
+    [sensitiveDataRevealedForSession, state.settings.hideSensitiveData],
   )
 
   const replaceState = useCallback(async (nextState: typeof state) => {
@@ -515,7 +539,11 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       removeBudget,
       setTheme,
       setCurrency,
+      setHideSensitiveData,
       setHideOverspendingBudgetsInHome,
+      sensitiveDataRevealedForSession,
+      shouldHideSensitiveValues: shouldHideSensitiveValuesNow,
+      revealSensitiveDataForSession,
       updateBackupSettings,
       replaceState,
     }),
@@ -538,7 +566,11 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       removeBudget,
       setTheme,
       setCurrency,
+      setHideSensitiveData,
       setHideOverspendingBudgetsInHome,
+      sensitiveDataRevealedForSession,
+      shouldHideSensitiveValuesNow,
+      revealSensitiveDataForSession,
       updateBackupSettings,
       replaceState,
     ],

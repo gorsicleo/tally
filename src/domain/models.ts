@@ -61,6 +61,7 @@ export interface AppSettings extends BackupPreferences {
   theme: ThemeMode
   currency: string
   hideOverspendingBudgetsInHome?: boolean
+  hideSensitiveData?: boolean
 }
 
 export interface FinanceState {

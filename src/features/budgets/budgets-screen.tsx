@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatCurrency, formatMonthLabel } from '../../domain/formatters'
+import { formatMonthLabel } from '../../domain/formatters'
 import {
   getBudgetAllocationSummary,
   getBudgetSignals,
@@ -9,20 +9,22 @@ import {
 import { useFinance } from '../../state/use-finance'
 import { BudgetEditorSheet } from './budget-editor-sheet'
 import { getVisibleManagedCategories } from '../../domain/categories'
+import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 
 function formatAvailableToBudgetLabel(
   availableToBudget: number,
   currency: string,
+  hideSensitiveValues: boolean,
 ): string {
   if (availableToBudget < 0) {
-    return `${formatCurrency(Math.abs(availableToBudget), currency)} over-allocated`
+    return `${formatSensitiveCurrency(Math.abs(availableToBudget), currency, hideSensitiveValues)} over-allocated`
   }
 
-  return `${formatCurrency(Math.max(availableToBudget, 0), currency)} left`
+  return `${formatSensitiveCurrency(Math.max(availableToBudget, 0), currency, hideSensitiveValues)} left`
 }
 
 export function BudgetsScreen() {
-  const { state, upsertBudget, removeBudget } = useFinance()
+  const { state, upsertBudget, removeBudget, shouldHideSensitiveValues } = useFinance()
   const currentMonthKey = useMemo(() => getMonthKey(), [])
   const [monthKey, setMonthKey] = useState(currentMonthKey)
   const monthLabel = useMemo(() => formatMonthLabel(monthKey), [monthKey])
@@ -50,6 +52,7 @@ export function BudgetsScreen() {
   const availabilityLabel = formatAvailableToBudgetLabel(
     allocationSummary.availableToBudgetForPeriod,
     currency,
+    shouldHideSensitiveValues,
   )
   const allocationHelperText = !allocationSummary.hasIncomeRecorded
     ? `No income recorded ${monthKey === currentMonthKey ? 'this month' : `for ${monthLabel}`}.`
@@ -103,9 +106,9 @@ export function BudgetsScreen() {
         </h2>
 
         <p className="budget-allocation-meta">
-          Income {formatCurrency(allocationSummary.totalIncomeForPeriod, currency)}
+          Income {formatSensitiveCurrency(allocationSummary.totalIncomeForPeriod, currency, shouldHideSensitiveValues)}
           {' • '}
-          Allocated {formatCurrency(allocationSummary.totalAllocatedBudgetLimitsForPeriod, currency)}
+          Allocated {formatSensitiveCurrency(allocationSummary.totalAllocatedBudgetLimitsForPeriod, currency, shouldHideSensitiveValues)}
         </p>
 
         {allocationHelperText ? (
@@ -138,9 +141,9 @@ export function BudgetsScreen() {
           {budgetSignals.map((entry) => {
             const statusLabel =
               entry.remaining >= 0
-                ? `${formatCurrency(entry.remaining, currency)} left`
-                : `${formatCurrency(Math.abs(entry.remaining), currency)} over`
-            const detailLabel = `${formatCurrency(entry.spent, currency)} / ${formatCurrency(entry.limit, currency)}`
+                ? `${formatSensitiveCurrency(entry.remaining, currency, shouldHideSensitiveValues)} left`
+                : `${formatSensitiveCurrency(Math.abs(entry.remaining), currency, shouldHideSensitiveValues)} over`
+            const detailLabel = `${formatSensitiveCurrency(entry.spent, currency, shouldHideSensitiveValues)} / ${formatSensitiveCurrency(entry.limit, currency, shouldHideSensitiveValues)}`
             const categoriesLabel = entry.categories.map((category) => category.name).join(', ')
 
             return (
@@ -196,6 +199,7 @@ export function BudgetsScreen() {
           spent={selectedSignal?.spent ?? 0}
           allocationSummary={allocationSummary}
           currency={currency}
+          hideSensitiveValues={shouldHideSensitiveValues}
           monthLabel={monthLabel}
           onClose={() => setEditingBudgetId(null)}
           onSave={(input) =>
