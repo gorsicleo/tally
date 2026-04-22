@@ -4,6 +4,7 @@ import type { PropsWithChildren } from 'react'
 import { FinanceContext } from './finance-store'
 import { useFinance } from './use-finance'
 import { initialFinanceState } from '../domain/default-data'
+import { createFinanceContextValue } from '../test/finance-test-utils'
 
 describe('useFinance', () => {
   it('throws when used outside FinanceProvider', () => {
@@ -15,29 +16,10 @@ describe('useFinance', () => {
   it('returns context value when provider is present', () => {
     const wrapper = ({ children }: PropsWithChildren) => (
       <FinanceContext.Provider
-        value={{
+        value={createFinanceContextValue({
           state: initialFinanceState,
           isLoaded: true,
-          addCategory: () => {},
-          updateCategory: () => {},
-          previewCategoryDeletion: () => ({ ok: false, message: 'noop' }),
-          deleteCategory: () => null,
-          addTransaction: () => {},
-          updateTransaction: () => {},
-          deleteTransaction: () => {},
-          addRecurringTemplate: () => null,
-          updateRecurringTemplate: () => {},
-          stopRecurringTemplate: () => {},
-          addRecurringOccurrences: () => {},
-          skipRecurringOccurrences: () => {},
-          upsertBudget: () => null,
-          removeBudget: () => {},
-          setTheme: () => {},
-          setCurrency: () => {},
-          setHideOverspendingBudgetsInHome: () => {},
-          updateBackupSettings: () => {},
-          replaceState: async () => {},
-        }}
+        })}
       >
         {children}
       </FinanceContext.Provider>

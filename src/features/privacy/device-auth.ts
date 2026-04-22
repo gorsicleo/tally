@@ -19,7 +19,13 @@ function bytesToBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
-function base64UrlToBytes(value: string): Uint8Array {
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(buffer).set(bytes)
+  return buffer
+}
+
+function base64UrlToBytes(value: string): ArrayBuffer {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
   const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
   const decoded = atob(padded)
@@ -29,15 +35,15 @@ function base64UrlToBytes(value: string): Uint8Array {
     bytes[index] = decoded.charCodeAt(index)
   }
 
-  return bytes
+  return toArrayBuffer(bytes)
 }
 
-function randomBytes(length: number): Uint8Array {
+function randomBytes(length: number): ArrayBuffer {
   const bytes = new Uint8Array(length)
 
   crypto.getRandomValues(bytes)
 
-  return bytes
+  return toArrayBuffer(bytes)
 }
 
 function isDeviceAuthTransport(value: unknown): value is DeviceAuthTransport {
@@ -160,7 +166,7 @@ export async function authenticateWithDeviceCredential(
           {
             type: 'public-key',
             id: base64UrlToBytes(credential.credentialId),
-            transports: credential.transports,
+            transports: credential.transports ? [...credential.transports] : undefined,
           },
         ],
         timeout: DEVICE_AUTH_TIMEOUT_MS,
