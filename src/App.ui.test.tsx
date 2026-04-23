@@ -871,12 +871,7 @@ describe('App UI behavior', () => {
       },
     })
 
-    const { user } = renderWithUser(<App />)
-
-    expect(await screen.findByRole('button', { name: 'Unlock with device authentication' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('PIN')).not.toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: 'Unlock with device authentication' }))
+    renderWithUser(<App />)
 
     await waitFor(() => {
       expect(deviceAuthState.authenticateSpy).toHaveBeenCalled()
@@ -901,11 +896,13 @@ describe('App UI behavior', () => {
     const { user } = renderWithUser(<App />)
 
     await screen.findByRole('heading', { name: 'Unlock Tally' })
-    await user.click(screen.getByRole('button', { name: 'Unlock with device authentication' }))
+
+    await waitFor(() => {
+      expect(deviceAuthState.authenticateSpy).toHaveBeenCalled()
+    })
 
     expect(await screen.findByText('Device authentication was cancelled. Use PIN instead.')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Use PIN instead' }))
     await user.type(screen.getByLabelText('PIN'), '1234')
     await user.click(screen.getByRole('button', { name: 'Unlock' }))
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 interface AppLockGateProps {
   cooldownUntil: number | null
@@ -32,6 +32,7 @@ export function AppLockGate({
   const [unlockMode, setUnlockMode] = useState<'device' | 'pin' | 'recovery'>(
     canUseDeviceAuthentication ? 'device' : 'pin',
   )
+  const [hasAttemptedDeviceAuth, setHasAttemptedDeviceAuth] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busyMode, setBusyMode] = useState<'pin' | 'device' | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -83,7 +84,7 @@ export function AppLockGate({
     }
   }
 
-  const handleDeviceAuth = async () => {
+  const handleDeviceAuth = useCallback(async (fallbackToPinOnFailure = false) => {
     if (isBusy) {
       return
     }
@@ -95,12 +96,24 @@ export function AppLockGate({
       const nextError = await onUnlockWithDeviceAuthentication()
 
       if (nextError) {
+        if (fallbackToPinOnFailure) {
+          setUnlockMode('pin')
+        }
         setError(nextError)
       }
     } finally {
       setBusyMode(null)
     }
-  }
+  }, [isBusy, onUnlockWithDeviceAuthentication])
+
+  useEffect(() => {
+    if (!canUseDeviceAuthentication || unlockMode !== 'device' || hasAttemptedDeviceAuth || isBusy) {
+      return
+    }
+
+    setHasAttemptedDeviceAuth(true)
+    void handleDeviceAuth(true)
+  }, [canUseDeviceAuthentication, handleDeviceAuth, hasAttemptedDeviceAuth, isBusy, unlockMode])
 
   const handleRecoveryCodeSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -132,38 +145,17 @@ export function AppLockGate({
       <h1 id="unlock-gate-title">Unlock Tally</h1>
       <p className="unlock-gate-copy">
         {canUseDeviceAuthentication && unlockMode === 'device'
-          ? 'Use device authentication to open your ledger.'
-          : 'Enter your PIN to open your ledger on this device.'}
+          ? 'Use device authentication to open Tally.'
+          : 'Enter your PIN to open Tally on this device.'}
       </p>
 
       {canUseDeviceAuthentication && unlockMode === 'device' ? (
         <div className="field-grid unlock-gate-form">
-          <div className="unlock-gate-actions">
-            <button
-              type="button"
-              className="submit-button"
-              onClick={() => {
-                void handleDeviceAuth()
-              }}
-              disabled={isBusy}
-            >
-              {busyMode === 'device' ? 'Checking device...' : 'Unlock with device authentication'}
-            </button>
-          </div>
-
-          <div className="unlock-gate-actions">
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => {
-                setUnlockMode('pin')
-                setError(null)
-              }}
-              disabled={isBusy}
-            >
-              Use PIN instead
-            </button>
-          </div>
+          <p className="support-copy">
+            {busyMode === 'device'
+              ? 'Checking device authentication...'
+              : 'Preparing device authentication...'}
+          </p>
 
           {canUseRecoveryCodes ? (
             <div className="unlock-gate-actions">
