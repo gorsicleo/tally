@@ -764,13 +764,13 @@ export function FinanceProvider({ children }: PropsWithChildren) {
   }, [])
 
   const unlockAppWithDeviceAuthentication = useCallback(async () => {
-    if (!shouldRequireAppLock(stateRef.current.settings)) {
+    if (!shouldRequireAppLock(state.settings)) {
       setHasSessionUnlock(false)
       return null
     }
 
     const result = await authenticateWithDeviceCredential(
-      stateRef.current.settings.deviceAuthCredential,
+      state.settings.deviceAuthCredential,
     )
 
     if (!result.ok) {
@@ -783,7 +783,7 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     setHasSessionUnlock(true)
 
     return null
-  }, [])
+  }, [state.settings])
 
   const generateRecoveryCodes = useCallback(async (currentPin: string | null) => {
     if (!stateRef.current.settings.appLockPinVerifier) {
