@@ -651,10 +651,21 @@ textarea:focus-visible {
 }
 
 .recurring-due-card-head strong {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recurring-due-card-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recurring-due-card-amount {
+  flex-shrink: 0;
   white-space: nowrap;
 }
 
@@ -2469,6 +2480,11 @@ textarea {
   align-content: start;
 }
 
+.spotlight-card p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .mini-status-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2836,6 +2852,17 @@ textarea {
 
 .budget-sheet-stats {
   margin-top: 4px;
+}
+
+.budget-sheet-stats div,
+.budget-sheet-stats strong {
+  min-width: 0;
+}
+
+.budget-sheet-stats strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-input-row input {
