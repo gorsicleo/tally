@@ -57,12 +57,14 @@ export function RecurringDueSection({
               <div className="recurring-due-card-head">
                 <div>
                   <strong>
-                    {group.title}{' '}
-                    {formatSensitiveCurrency(
-                      group.template.amount,
-                      currency,
-                      shouldHideSensitiveValues,
-                    )}
+                    <span className="recurring-due-card-title">{group.title}</span>
+                    <span className="recurring-due-card-amount">
+                      {formatSensitiveCurrency(
+                        group.template.amount,
+                        currency,
+                        shouldHideSensitiveValues,
+                      )}
+                    </span>
                   </strong>
                   <p>
                     {group.frequencyLabel} · {dueCount} due
