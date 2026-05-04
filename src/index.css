@@ -646,6 +646,18 @@ textarea:focus-visible {
   gap: 12px;
 }
 
+.recurring-due-card-head > div {
+  min-width: 0;
+}
+
+.recurring-due-card-head strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .recurring-due-summary,
 .sheet-recurring-origin-copy,
 .recurring-due-occurrence-copy span,
@@ -788,6 +800,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
   gap: 12px;
   padding: 14px 16px;
   border-radius: var(--radius-md);
@@ -801,11 +814,19 @@ textarea:focus-visible {
 }
 
 .financial-row span {
+  min-width: 0;
+  flex: 1;
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .financial-row strong {
+  min-width: 0;
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
   font-size: 1.1rem;
 }
 
@@ -1009,6 +1030,12 @@ textarea:focus-visible {
 }
 
 .insights-hero-value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: clamp(1.9rem, 9vw, 3rem);
   line-height: 0.94;
 }
@@ -1034,6 +1061,10 @@ textarea:focus-visible {
 }
 
 .insight-stat-card strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 1rem;
 }
 
@@ -1063,7 +1094,7 @@ textarea:focus-visible {
 
 .insights-trend-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(96px, 44%);
   align-items: center;
   gap: 10px;
 }
@@ -1071,6 +1102,18 @@ textarea:focus-visible {
 .insights-trend-label,
 .insights-trend-amount {
   font-size: 0.82rem;
+}
+
+.insights-trend-label,
+.insights-trend-amount {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insights-trend-amount {
+  text-align: right;
 }
 
 .insights-trend-track,
@@ -1111,12 +1154,22 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
   gap: 10px;
 }
 
 .insights-category-head span,
 .insights-category-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.86rem;
+}
+
+.insights-category-head strong {
+  max-width: 58%;
+  text-align: right;
 }
 
 .insights-chart-surface {
@@ -1196,6 +1249,10 @@ textarea:focus-visible {
 
 .insights-chart-caption-item strong,
 .insights-donut-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.92rem;
 }
 
@@ -1252,6 +1309,12 @@ textarea:focus-visible {
 }
 
 .insights-donut-total {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: clamp(1.2rem, 4.6vw, 1.7rem);
 }
 
@@ -1263,6 +1326,7 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
@@ -1274,7 +1338,13 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
   min-width: 0;
+}
+
+.insights-donut-row strong {
+  max-width: 46%;
+  text-align: right;
 }
 
 .insights-donut-row-copy {
@@ -1305,12 +1375,23 @@ textarea:focus-visible {
 }
 
 .records-total-bar span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-muted);
   font-size: 0.84rem;
 }
 
 .records-total-bar strong {
-  justify-self: end;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  justify-self: stretch;
   color: var(--text-primary);
 }
 
@@ -1607,6 +1688,16 @@ button.settings-category-row:hover {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.recurring-settings-meta .settings-row-value {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .category-sheet-panel {
@@ -1904,7 +1995,7 @@ textarea {
 }
 
 .transaction-item.compact-record {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 44%);
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -1962,7 +2053,7 @@ textarea {
 .transaction-item.compact-record .transaction-tail {
   justify-items: end;
   gap: 4px;
-  min-width: fit-content;
+  min-width: 0;
 }
 
 .transaction-item.compact-record .transaction-amount {
@@ -2015,6 +2106,12 @@ textarea {
 }
 
 .transaction-amount {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
   font-size: 1.1rem;
 }
 
@@ -2547,6 +2644,12 @@ textarea {
 }
 
 .budget-allocation-value {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: clamp(1.5rem, 7vw, 2.5rem);
   line-height: 0.94;
 }
@@ -2570,6 +2673,12 @@ textarea {
 .budget-signal-action {
   font-size: 0.78rem;
   color: var(--text-muted);
+}
+
+.budget-allocation-meta,
+.budget-allocation-preview,
+.budget-signal-detail {
+  overflow-wrap: anywhere;
 }
 
 .budget-recurring-control {
@@ -2658,6 +2767,10 @@ textarea {
 
 .budget-signal-name strong,
 .budget-signal-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.92rem;
 }
 
@@ -2665,7 +2778,9 @@ textarea {
   display: grid;
   justify-items: end;
   gap: 4px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 56%;
+  flex-shrink: 1;
 }
 
 .budget-signal-summary strong {
@@ -2930,8 +3045,7 @@ textarea {
   }
 
   .records-total-bar {
-    grid-template-columns: max-content max-content;
-    justify-content: space-between;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: center;
   }
 
