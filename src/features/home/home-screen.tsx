@@ -4,10 +4,14 @@ import {
   getBudgetSignals,
   getCategoryTotals,
   getComparisonOverview,
+  getHomeFinancialGoalSummaries,
   getMonthKey,
   getMonthlyOverview,
   getRecentTransactions,
 } from '../../domain/selectors'
+import {
+  financialGoalTypeLabels,
+} from '../../domain/financial-goals'
 import type { Transaction } from '../../domain/models'
 import { RecurringDueSection } from '../recurring/recurring-due-section'
 import { useFinance } from '../../state/use-finance'
@@ -16,7 +20,13 @@ import { formatSensitiveCurrency } from '../privacy/sensitive-data'
 import type { AppTab } from '../shell/tab-bar'
 
 interface HomeScreenProps {
-  onNavigate: (tab: AppTab) => void
+  onNavigate: (
+    tab: AppTab,
+    options?: {
+      budgetsView?: 'budgets' | 'goals'
+      openCreateGoal?: boolean
+    },
+  ) => void
   onEditTransaction: (transaction: Transaction) => void
   onEditRecurring: (templateId: string) => void
   onShowToast: (message: string) => void
@@ -53,6 +63,10 @@ export function HomeScreen({
   const topCategory = useMemo(
     () => getCategoryTotals(state, monthKey, 'expense')[0] ?? null,
     [state, monthKey],
+  )
+  const goalSummaries = useMemo(
+    () => getHomeFinancialGoalSummaries(state, 3),
+    [state],
   )
   const currency = state.settings.currency
 
@@ -156,6 +170,59 @@ export function HomeScreen({
           })}
         </section>
       ) : null}
+
+      <section className="panel home-goals-card">
+        <div className="section-heading-row compact-end">
+          <div>
+            <p className="eyebrow">Financial goals</p>
+            <p>Track long-term savings progress.</p>
+          </div>
+        </div>
+
+        {goalSummaries.length > 0 ? (
+          <div className="goal-home-list" aria-label="Financial goals summary">
+            {goalSummaries.map((summary) => (
+              <article key={summary.goal.id} className="goal-home-row">
+                <div className="goal-home-head">
+                  <strong>{summary.goal.name}</strong>
+                  <span>{Math.round(summary.progressRatio * 100)}%</span>
+                </div>
+                <p className="goal-home-type">{financialGoalTypeLabels[summary.goal.type]}</p>
+                <div className="progress-track budget-signal-track">
+                  <span
+                    className="safe"
+                    style={{ width: `${summary.progressRatio * 100}%` }}
+                  />
+                </div>
+              </article>
+            ))}
+
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => onNavigate('budgets', { budgetsView: 'goals' })}
+            >
+              View all
+            </button>
+          </div>
+        ) : (
+          <div className="goal-home-empty">
+            <p>Start planning future purchases.</p>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() =>
+                onNavigate('budgets', {
+                  budgetsView: 'goals',
+                  openCreateGoal: true,
+                })
+              }
+            >
+              Create goal
+            </button>
+          </div>
+        )}
+      </section>
 
       <RecurringDueSection
         currency={currency}

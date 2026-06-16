@@ -322,3 +322,102 @@ describe('financeReducer category and budget safety', () => {
     expect(nextState.settings.changesSinceBackup).toBe(1)
   })
 })
+
+describe('financeReducer financial goals', () => {
+  it('adds, updates, and archives financial goals', () => {
+    const state = cloneState()
+
+    const added = financeReducer(state, {
+      type: 'add-financial-goal',
+      payload: {
+        id: 'goal-house',
+        name: 'House',
+        description: 'Down payment',
+        type: 'house',
+        targetAmount: 150000,
+        currentAmount: 5000,
+        targetDate: '2027-06-01',
+        priority: 'high',
+        status: 'active',
+        createdAt: '2026-06-15T10:00:00.000Z',
+        updatedAt: '2026-06-15T10:00:00.000Z',
+      },
+    })
+
+    expect(added.financialGoals).toHaveLength(1)
+    expect(added.settings.changesSinceBackup).toBe(1)
+
+    const updated = financeReducer(added, {
+      type: 'update-financial-goal',
+      payload: {
+        ...added.financialGoals[0],
+        currentAmount: 6500,
+        updatedAt: '2026-06-16T10:00:00.000Z',
+      },
+    })
+
+    expect(updated.financialGoals[0].currentAmount).toBe(6500)
+    expect(updated.settings.changesSinceBackup).toBe(2)
+
+    const archived = financeReducer(updated, {
+      type: 'archive-financial-goal',
+      payload: {
+        id: 'goal-house',
+        updatedAt: '2026-06-17T10:00:00.000Z',
+      },
+    })
+
+    expect(archived.financialGoals[0].status).toBe('archived')
+    expect(archived.settings.changesSinceBackup).toBe(3)
+  })
+
+  it('rejects invalid financial goal mutations', () => {
+    const state = cloneState()
+
+    const invalidAdd = financeReducer(state, {
+      type: 'add-financial-goal',
+      payload: {
+        id: 'goal-invalid',
+        name: ' ',
+        description: '',
+        type: 'custom',
+        targetAmount: 0,
+        currentAmount: 0,
+        targetDate: null,
+        priority: 'medium',
+        status: 'active',
+        createdAt: '2026-06-15T10:00:00.000Z',
+        updatedAt: '2026-06-15T10:00:00.000Z',
+      },
+    })
+
+    expect(invalidAdd).toBe(state)
+
+    const validState = financeReducer(state, {
+      type: 'add-financial-goal',
+      payload: {
+        id: 'goal-valid',
+        name: 'Emergency',
+        description: '',
+        type: 'emergencyFund',
+        targetAmount: 10000,
+        currentAmount: 1000,
+        targetDate: null,
+        priority: 'medium',
+        status: 'active',
+        createdAt: '2026-06-15T10:00:00.000Z',
+        updatedAt: '2026-06-15T10:00:00.000Z',
+      },
+    })
+
+    const invalidUpdate = financeReducer(validState, {
+      type: 'update-financial-goal',
+      payload: {
+        ...validState.financialGoals[0],
+        targetAmount: 0,
+      },
+    })
+
+    expect(invalidUpdate).toBe(validState)
+  })
+})

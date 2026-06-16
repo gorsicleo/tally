@@ -12,6 +12,7 @@ The canonical model is `FinanceState` in [src/domain/models.ts](../src/domain/mo
 - `transactions: Transaction[]`
 - `budgets: Budget[]`
 - `recurringTemplates: RecurringTemplate[]`
+- `financialGoals: FinancialGoal[]`
 - `settings: AppSettings`
 
 All persistence and backup restore paths are normalized through `parsePersistedFinanceState` in [src/domain/validation.ts](../src/domain/validation.ts).
@@ -96,6 +97,28 @@ References:
 - [src/domain/recurring.ts](../src/domain/recurring.ts)
 - [src/state/finance-context.tsx](../src/state/finance-context.tsx)
 - [src/state/finance-reducer.ts](../src/state/finance-reducer.ts)
+
+### FinancialGoal
+
+Defined in [src/domain/models.ts](../src/domain/models.ts) as:
+
+- Identity and timestamps: `id`, `createdAt`, `updatedAt`
+- Goal fields: `name`, `description`, `type`, `targetAmount`, `currentAmount`, `targetDate`, `priority`, `status`
+
+Important semantics:
+
+- `type` is one of `house`, `car`, `emergencyFund`, `vacation`, `education`, `custom`.
+- `priority` is one of `high`, `medium`, `low`.
+- `status` is `active` or `archived`; v1 UI only surfaces active goals.
+- Progress is derived as `currentAmount / targetAmount`, with UI capping at 100%.
+- Remaining amount is derived as `max(targetAmount - currentAmount, 0)`.
+
+References:
+
+- [src/domain/financial-goals.ts](../src/domain/financial-goals.ts)
+- [src/domain/selectors.ts](../src/domain/selectors.ts)
+- [src/features/budgets/budgets-screen.tsx](../src/features/budgets/budgets-screen.tsx)
+- [src/features/home/home-screen.tsx](../src/features/home/home-screen.tsx)
 
 ### AppSettings and BackupPreferences
 
@@ -186,6 +209,7 @@ The following areas are high-risk when changing the model:
 - `Transaction.categoryId` and `RecurringTemplate.categoryId` normalization behavior.
 - `Transaction.recurringTemplateId` and `Transaction.recurringOccurrenceDate` migration defaults.
 - `Budget.categoryIds` and legacy budget migration behavior.
+- `FinancialGoal` parsing defaults for older persisted/backup payloads.
 - `AppSettings` backup metadata fields, especially `changesSinceBackup` and `lastBackupAt`.
 - Storage key/version assumptions in [src/persistence/finance-storage.ts](../src/persistence/finance-storage.ts).
 - Backup schema and payload contract in [src/backup/backup-models.ts](../src/backup/backup-models.ts).
@@ -200,6 +224,7 @@ When changing data model fields or relationships:
 4. Update backup schema/types/services in [src/backup/backup-models.ts](../src/backup/backup-models.ts), [src/backup/backup-service.ts](../src/backup/backup-service.ts), and [src/backup/restore-service.ts](../src/backup/restore-service.ts).
 5. Add or update focused tests in:
    - [src/domain/validation.test.ts](../src/domain/validation.test.ts)
+   - [src/domain/financial-goals.test.ts](../src/domain/financial-goals.test.ts)
    - [src/domain/category-service.test.ts](../src/domain/category-service.test.ts)
    - [src/domain/recurring.test.ts](../src/domain/recurring.test.ts)
    - [src/backup/restore-service.test.ts](../src/backup/restore-service.test.ts)

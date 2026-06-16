@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initialFinanceState } from './default-data'
 import type { Budget, FinanceState, Transaction, TransactionType } from './models'
 import {
+  getActiveFinancialGoals,
   getAvailableToBudgetForPeriod,
   getBudgetAllocationSummary,
   getBudgetSignals,
+  getHomeFinancialGoalSummaries,
   getRecentTransactions,
   getOverAllocatedAmountForPeriod,
   getTotalAllocatedBudgetLimitsForPeriod,
@@ -319,5 +321,149 @@ describe('getRecentTransactions', () => {
 
     expect(recent).toHaveLength(1)
     expect(recent[0]?.id).toBe('txn-today')
+  })
+})
+
+describe('financial goal selectors', () => {
+  it('filters archived goals and orders active goals by priority and updatedAt', () => {
+    const state = createState()
+    state.financialGoals = [
+      {
+        id: 'goal-medium-older',
+        name: 'Vacation',
+        description: '',
+        type: 'vacation',
+        targetAmount: 5000,
+        currentAmount: 1500,
+        targetDate: null,
+        priority: 'medium',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-10T10:00:00.000Z',
+      },
+      {
+        id: 'goal-high',
+        name: 'House',
+        description: '',
+        type: 'house',
+        targetAmount: 100000,
+        currentAmount: 5000,
+        targetDate: null,
+        priority: 'high',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-05T10:00:00.000Z',
+      },
+      {
+        id: 'goal-low',
+        name: 'Car',
+        description: '',
+        type: 'car',
+        targetAmount: 20000,
+        currentAmount: 1000,
+        targetDate: null,
+        priority: 'low',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-14T10:00:00.000Z',
+      },
+      {
+        id: 'goal-archived',
+        name: 'Old goal',
+        description: '',
+        type: 'custom',
+        targetAmount: 1000,
+        currentAmount: 1000,
+        targetDate: null,
+        priority: 'high',
+        status: 'archived',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-15T10:00:00.000Z',
+      },
+      {
+        id: 'goal-medium-newer',
+        name: 'Emergency Fund',
+        description: '',
+        type: 'emergencyFund',
+        targetAmount: 10000,
+        currentAmount: 2500,
+        targetDate: null,
+        priority: 'medium',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-13T10:00:00.000Z',
+      },
+    ]
+
+    expect(getActiveFinancialGoals(state).map((goal) => goal.id)).toEqual([
+      'goal-high',
+      'goal-medium-newer',
+      'goal-medium-older',
+      'goal-low',
+    ])
+  })
+
+  it('builds home summaries using only top three active goals', () => {
+    const state = createState()
+    state.financialGoals = [
+      {
+        id: 'goal-1',
+        name: 'Goal 1',
+        description: '',
+        type: 'house',
+        targetAmount: 100,
+        currentAmount: 10,
+        targetDate: null,
+        priority: 'high',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-15T10:00:00.000Z',
+      },
+      {
+        id: 'goal-2',
+        name: 'Goal 2',
+        description: '',
+        type: 'custom',
+        targetAmount: 100,
+        currentAmount: 20,
+        targetDate: null,
+        priority: 'medium',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-14T10:00:00.000Z',
+      },
+      {
+        id: 'goal-3',
+        name: 'Goal 3',
+        description: '',
+        type: 'custom',
+        targetAmount: 100,
+        currentAmount: 30,
+        targetDate: null,
+        priority: 'low',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-13T10:00:00.000Z',
+      },
+      {
+        id: 'goal-4',
+        name: 'Goal 4',
+        description: '',
+        type: 'custom',
+        targetAmount: 100,
+        currentAmount: 40,
+        targetDate: null,
+        priority: 'low',
+        status: 'active',
+        createdAt: '2026-06-01T10:00:00.000Z',
+        updatedAt: '2026-06-12T10:00:00.000Z',
+      },
+    ]
+
+    const summaries = getHomeFinancialGoalSummaries(state, 3)
+
+    expect(summaries).toHaveLength(3)
+    expect(summaries[0].goal.id).toBe('goal-1')
+    expect(Math.round(summaries[0].progressRatio * 100)).toBe(10)
   })
 })

@@ -753,12 +753,45 @@ textarea:focus-visible {
 }
 
 .home-summary-card,
+.home-goals-card,
 .records-total-bar,
 .filters-panel,
 .history-footer,
 .preference-grid {
   display: grid;
   gap: 14px;
+}
+
+.goal-home-list {
+  display: grid;
+  gap: 12px;
+}
+
+.goal-home-row {
+  display: grid;
+  gap: 8px;
+}
+
+.goal-home-row .budget-signal-track {
+  width: 100%;
+}
+
+.goal-home-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.goal-home-head span {
+  margin-left: auto;
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.goal-home-type {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
 }
 
 .screen-stack > *,

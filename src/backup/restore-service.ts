@@ -8,7 +8,7 @@ import {
   type TallyBackupPayload,
 } from './backup-models'
 
-type SupportedBackupSchemaVersion = 1 | typeof BACKUP_SCHEMA_VERSION
+type SupportedBackupSchemaVersion = 1 | 2 | typeof BACKUP_SCHEMA_VERSION
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -28,6 +28,7 @@ function buildRestoredState(payload: TallyBackupPayload): FinanceState {
     transactions: cloneItems(payload.data.transactions),
     budgets: cloneItems(payload.data.budgets),
     recurringTemplates: cloneItems(payload.data.recurringTemplates),
+    financialGoals: cloneItems(payload.data.financialGoals),
     settings: {
       ...payload.data.preferences,
       lastBackupAt: payload.data.preferences.lastBackupAt ?? payload.exportedAt,
@@ -40,7 +41,7 @@ function buildRestoredState(payload: TallyBackupPayload): FinanceState {
 function isSupportedBackupSchemaVersion(
   value: unknown,
 ): value is SupportedBackupSchemaVersion {
-  return value === 1 || value === BACKUP_SCHEMA_VERSION
+  return value === 1 || value === 2 || value === BACKUP_SCHEMA_VERSION
 }
 
 export function validateBackupPayload(value: unknown): BackupParseResult {
@@ -69,8 +70,15 @@ export function validateBackupPayload(value: unknown): BackupParseResult {
   }
 
   if (
-    value.schemaVersion === BACKUP_SCHEMA_VERSION &&
+    value.schemaVersion >= 2 &&
     !Array.isArray(value.data.recurringTemplates)
+  ) {
+    return { ok: false, message: 'This backup file is not valid.' }
+  }
+
+  if (
+    value.schemaVersion >= 3 &&
+    !Array.isArray(value.data.financialGoals)
   ) {
     return { ok: false, message: 'This backup file is not valid.' }
   }
@@ -80,8 +88,12 @@ export function validateBackupPayload(value: unknown): BackupParseResult {
     transactions: value.data.transactions,
     budgets: value.data.budgets,
     recurringTemplates:
-      value.schemaVersion === BACKUP_SCHEMA_VERSION
+      value.schemaVersion >= 2
         ? value.data.recurringTemplates
+        : [],
+    financialGoals:
+      value.schemaVersion >= 3
+        ? value.data.financialGoals
         : [],
     settings: value.data.preferences,
   })
@@ -99,6 +111,7 @@ export function validateBackupPayload(value: unknown): BackupParseResult {
       categories: cloneItems(candidateState.categories),
       budgets: cloneItems(candidateState.budgets),
       recurringTemplates: cloneItems(candidateState.recurringTemplates),
+      financialGoals: cloneItems(candidateState.financialGoals),
       preferences: { ...candidateState.settings },
     },
   }

@@ -2,6 +2,8 @@ import { createContext } from 'react'
 import type {
   BackupPreferences,
   CategoryKind,
+  FinancialGoalPriority,
+  FinancialGoalType,
   FinanceState,
   RecurringFrequency,
   ThemeMode,
@@ -71,6 +73,17 @@ export interface ApplyRecurringOccurrencesInput {
   occurrenceDates: string[]
 }
 
+export interface UpsertFinancialGoalInput {
+  id?: string
+  name: string
+  description?: string | null
+  type: FinancialGoalType
+  targetAmount: number
+  currentAmount: number
+  targetDate: string | null
+  priority: FinancialGoalPriority
+}
+
 export interface FinanceContextValue {
   state: FinanceState
   isLoaded: boolean
@@ -90,6 +103,8 @@ export interface FinanceContextValue {
   skipRecurringOccurrences: (input: ApplyRecurringOccurrencesInput) => void
   upsertBudget: (input: UpsertBudgetInput) => string | null
   removeBudget: (budgetId: string) => void
+  upsertFinancialGoal: (input: UpsertFinancialGoalInput) => string | null
+  archiveFinancialGoal: (goalId: string) => void
   setTheme: (theme: ThemeMode) => void
   setCurrency: (currency: string) => void
   setHideSensitiveData: (hidden: boolean) => void

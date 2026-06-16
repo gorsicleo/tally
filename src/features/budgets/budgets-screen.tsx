@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { formatMonthLabel } from '../../domain/formatters'
 import {
+  getActiveFinancialGoals,
   getBudgetAllocationSummary,
   getBudgetSignals,
+  getFinancialGoalSummaries,
   getMonthKey,
   shiftMonthKey,
 } from '../../domain/selectors'
@@ -10,6 +12,11 @@ import { useFinance } from '../../state/use-finance'
 import { BudgetEditorSheet } from './budget-editor-sheet'
 import { getVisibleManagedCategories } from '../../domain/categories'
 import { formatSensitiveCurrency } from '../privacy/sensitive-data'
+import {
+  financialGoalPriorityLabels,
+  financialGoalTypeLabels,
+} from '../../domain/financial-goals'
+import { FinancialGoalSheet } from './financial-goal-sheet'
 
 function formatAvailableToBudgetLabel(
   availableToBudget: number,
@@ -23,13 +30,36 @@ function formatAvailableToBudgetLabel(
   return `${formatSensitiveCurrency(Math.max(availableToBudget, 0), currency, hideSensitiveValues)} left`
 }
 
-export function BudgetsScreen() {
-  const { state, upsertBudget, removeBudget, shouldHideSensitiveValues } = useFinance()
+interface BudgetsScreenProps {
+  initialView?: 'budgets' | 'goals'
+  openCreateGoalRequest?: boolean
+  onOpenCreateGoalHandled?: () => void
+}
+
+export function BudgetsScreen({
+  initialView = 'budgets',
+  openCreateGoalRequest = false,
+  onOpenCreateGoalHandled,
+}: BudgetsScreenProps) {
+  const {
+    state,
+    upsertBudget,
+    removeBudget,
+    upsertFinancialGoal,
+    archiveFinancialGoal,
+    shouldHideSensitiveValues,
+  } = useFinance()
   const currentMonthKey = useMemo(() => getMonthKey(), [])
   const [monthKey, setMonthKey] = useState(currentMonthKey)
+  const [view, setView] = useState<'budgets' | 'goals'>(initialView)
   const monthLabel = useMemo(() => formatMonthLabel(monthKey), [monthKey])
   const currency = state.settings.currency
   const [editingBudgetId, setEditingBudgetId] = useState<string | 'create' | null>(null)
+  const [goalSheet, setGoalSheet] = useState<
+    | { mode: 'create' }
+    | { mode: 'details' | 'edit'; goalId: string }
+    | null
+  >(null)
   const allocationSummary = useMemo(
     () => getBudgetAllocationSummary(state, monthKey),
     [monthKey, state],
@@ -49,6 +79,12 @@ export function BudgetsScreen() {
     (entry) => entry.budget.id === editingBudgetId,
   ) ?? null
   const selectedBudget = selectedSignal?.budget ?? null
+  const activeGoals = useMemo(() => getActiveFinancialGoals(state), [state])
+  const goalSummaries = useMemo(() => getFinancialGoalSummaries(activeGoals), [activeGoals])
+  const selectedGoal =
+    goalSheet && goalSheet.mode !== 'create'
+      ? activeGoals.find((goal) => goal.id === goalSheet.goalId) ?? null
+      : null
   const availabilityLabel = formatAvailableToBudgetLabel(
     allocationSummary.availableToBudgetForPeriod,
     currency,
@@ -65,8 +101,52 @@ export function BudgetsScreen() {
       ? 'neutral'
       : 'safe'
 
+  useEffect(() => {
+    setView(initialView)
+  }, [initialView])
+
+  useEffect(() => {
+    if (!openCreateGoalRequest || view !== 'goals') {
+      return
+    }
+
+    setGoalSheet({ mode: 'create' })
+    onOpenCreateGoalHandled?.()
+  }, [onOpenCreateGoalHandled, openCreateGoalRequest, view])
+
   return (
     <div className="screen-stack budgets-screen">
+      <section className="panel budget-view-switch-panel">
+        <div className="settings-inline-switch" role="tablist" aria-label="Budgets and goals">
+          <button
+            type="button"
+            role="tab"
+            className={view === 'budgets' ? 'active' : ''}
+            aria-selected={view === 'budgets'}
+            onClick={() => {
+              setView('budgets')
+              setGoalSheet(null)
+            }}
+          >
+            Budgets
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={view === 'goals' ? 'active' : ''}
+            aria-selected={view === 'goals'}
+            onClick={() => {
+              setView('goals')
+              setEditingBudgetId(null)
+            }}
+          >
+            Goals
+          </button>
+        </div>
+      </section>
+
+      {view === 'budgets' ? (
+        <>
       <section className={`panel budget-allocation-card ${availabilityTone}`.trim()}>
         <div className="budget-allocation-header">
           <div>
@@ -216,6 +296,124 @@ export function BudgetsScreen() {
           }
           onRemove={(budgetId) => {
             removeBudget(budgetId)
+          }}
+        />
+      ) : null}
+
+        </>
+      ) : (
+        <section className="panel budget-signal-list" aria-label="Financial goals">
+          <div className="section-heading-row budget-list-header">
+            <div>
+              <p className="eyebrow">Financial goals</p>
+              <p>Track progress for your long-term savings plans.</p>
+            </div>
+            <button
+              type="button"
+              className="ghost-button compact"
+              onClick={() => setGoalSheet({ mode: 'create' })}
+            >
+              + Create goal
+            </button>
+          </div>
+
+          {goalSummaries.length === 0 ? (
+            <p className="empty-state">No active goals yet. Create your first goal.</p>
+          ) : null}
+
+          {goalSummaries.map((entry) => (
+            <article
+              key={entry.goal.id}
+              className="budget-signal-row safe"
+              onClick={() => {
+                setGoalSheet({ mode: 'details', goalId: entry.goal.id })
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setGoalSheet({ mode: 'details', goalId: entry.goal.id })
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="budget-signal-head">
+                <div className="budget-signal-name">
+                  <strong>{entry.goal.name}</strong>
+                  <span className="budget-signal-detail">
+                    {financialGoalTypeLabels[entry.goal.type]}
+                    {' • '}
+                    {financialGoalPriorityLabels[entry.goal.priority]}
+                  </span>
+                </div>
+
+                <div className="budget-signal-summary">
+                  <strong>{Math.round(entry.progressRatio * 100)}%</strong>
+                </div>
+              </div>
+
+              <div className="budget-signal-body">
+                <span className="budget-signal-detail">
+                  {formatSensitiveCurrency(
+                    entry.goal.currentAmount,
+                    currency,
+                    shouldHideSensitiveValues,
+                  )}
+                  {' / '}
+                  {formatSensitiveCurrency(
+                    entry.goal.targetAmount,
+                    currency,
+                    shouldHideSensitiveValues,
+                  )}
+                  {' • Remaining '}
+                  {formatSensitiveCurrency(
+                    entry.remainingAmount,
+                    currency,
+                    shouldHideSensitiveValues,
+                  )}
+                  {entry.goal.targetDate ? ` • Target ${entry.goal.targetDate}` : ''}
+                </span>
+
+                <div className="progress-track budget-signal-track">
+                  <span
+                    className="safe"
+                    style={{ width: `${entry.progressRatio * 100}%` }}
+                  />
+                </div>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {goalSheet && (goalSheet.mode === 'create' || selectedGoal) ? (
+        <FinancialGoalSheet
+          mode={goalSheet.mode}
+          goal={selectedGoal}
+          currency={currency}
+          hideSensitiveValues={shouldHideSensitiveValues}
+          onClose={() => {
+            setGoalSheet(null)
+          }}
+          onSave={(input) =>
+            upsertFinancialGoal({
+              id: input.id,
+              name: input.name,
+              description: input.description,
+              type: input.type,
+              targetAmount: input.targetAmount,
+              currentAmount: input.currentAmount,
+              targetDate: input.targetDate,
+              priority: input.priority,
+            })
+          }
+          onArchive={(goalId) => {
+            archiveFinancialGoal(goalId)
+          }}
+          onRequestEdit={() => {
+            if (selectedGoal) {
+              setGoalSheet({ mode: 'edit', goalId: selectedGoal.id })
+            }
           }}
         />
       ) : null}

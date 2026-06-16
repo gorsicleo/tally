@@ -24,6 +24,8 @@ export function createFinanceContextValue(
     skipRecurringOccurrences: () => {},
     upsertBudget: () => null,
     removeBudget: () => {},
+    upsertFinancialGoal: () => null,
+    archiveFinancialGoal: () => {},
     setTheme: () => {},
     setCurrency: () => {},
     setHideSensitiveData: () => {},

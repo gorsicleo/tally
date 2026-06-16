@@ -3,6 +3,10 @@ import {
   UNCATEGORIZED_CATEGORY_ID,
 } from './categories'
 import {
+  isFinancialGoalPriority,
+  isFinancialGoalType,
+} from './financial-goals'
+import {
   normalizeBudgetCategoryIds,
   validateBudgetCategoryIds,
 } from './budget-service'
@@ -13,6 +17,8 @@ import type {
   Category,
   CategoryKind,
   CategorySystem,
+  FinancialGoal,
+  FinancialGoalStatus,
   DeviceAuthCredential,
   DeviceAuthTransport,
   FinanceState,
@@ -409,6 +415,61 @@ function parseRecurringTemplates(value: unknown): RecurringTemplate[] | null {
   return parsedTemplates
 }
 
+function parseFinancialGoalStatus(value: unknown): FinancialGoalStatus | null {
+  if (value === 'active' || value === 'archived') {
+    return value
+  }
+
+  return null
+}
+
+function parseFinancialGoal(value: unknown): FinancialGoal | null {
+  if (!hasBaseEntityFields(value)) {
+    return null
+  }
+
+  const status = parseFinancialGoalStatus(value.status)
+
+  if (
+    !isString(value.name) ||
+    !isString(value.description) ||
+    !isFinancialGoalType(value.type) ||
+    !isNumber(value.targetAmount) ||
+    value.targetAmount <= 0 ||
+    !isNumber(value.currentAmount) ||
+    value.currentAmount < 0 ||
+    !(value.targetDate === null || isString(value.targetDate)) ||
+    !isFinancialGoalPriority(value.priority) ||
+    status === null
+  ) {
+    return null
+  }
+
+  return {
+    id: value.id,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    name: value.name,
+    description: value.description,
+    type: value.type,
+    targetAmount: value.targetAmount,
+    currentAmount: value.currentAmount,
+    targetDate: value.targetDate,
+    priority: value.priority,
+    status,
+  }
+}
+
+function parseFinancialGoals(value: unknown): FinancialGoal[] | null {
+  if (!Array.isArray(value)) {
+    return null
+  }
+
+  return value
+    .map((entry) => parseFinancialGoal(entry))
+    .filter((entry): entry is FinancialGoal => entry !== null)
+}
+
 function parseAppLockPinVerifier(value: unknown): AppLockPinVerifier | null {
   if (!isRecord(value)) {
     return null
@@ -677,6 +738,8 @@ export function isFinanceState(value: unknown): value is FinanceState {
     value.budgets.every(isBudget) &&
     Array.isArray(value.recurringTemplates) &&
     value.recurringTemplates.every((entry) => parseRecurringTemplate(entry) !== null) &&
+    Array.isArray(value.financialGoals) &&
+    value.financialGoals.every((entry) => parseFinancialGoal(entry) !== null) &&
     isAppSettings(value.settings)
   )
 }
@@ -731,7 +794,11 @@ export function parsePersistedFinanceState(value: unknown): FinanceState | null 
     value.recurringTemplates === undefined ? [] : value.recurringTemplates
   const recurringTemplatesParsed = parseRecurringTemplates(recurringTemplatesRaw)
 
-  if (recurringTemplatesParsed === null) {
+  const financialGoalsRaw =
+    value.financialGoals === undefined ? [] : value.financialGoals
+  const financialGoals = parseFinancialGoals(financialGoalsRaw)
+
+  if (recurringTemplatesParsed === null || financialGoals === null) {
     return null
   }
 
@@ -744,6 +811,7 @@ export function parsePersistedFinanceState(value: unknown): FinanceState | null 
     transactions,
     budgets: [...budgetsById.values()],
     recurringTemplates,
+    financialGoals,
     settings,
   }
 }

@@ -39,6 +39,7 @@ export function buildBackupPayload(
       categories: cloneItems(state.categories),
       budgets: cloneItems(state.budgets),
       recurringTemplates: cloneItems(state.recurringTemplates),
+      financialGoals: cloneItems(state.financialGoals),
       preferences: buildExportSettings(state, exportedAt, settingsPatch),
     },
   }

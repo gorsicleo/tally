@@ -16,6 +16,7 @@ import {
   computeCategoryDeletionPlan,
   type CategoryDeletionPlanInput,
 } from '../domain/category-service'
+import { validateFinancialGoalInput } from '../domain/financial-goals'
 import {
   advanceRecurringNextDueDate,
   getProcessibleRecurringDates,
@@ -52,6 +53,7 @@ import {
   type AddRecurringTemplateInput,
   type AddTransactionInput,
   type ApplyRecurringOccurrencesInput,
+  type UpsertFinancialGoalInput,
   type UpsertBudgetInput,
   type UpdateRecurringTemplateInput,
   type UpdateCategoryInput,
@@ -596,6 +598,62 @@ export function FinanceProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'remove-budget', payload: { id: budgetId } })
   }, [])
 
+  const upsertFinancialGoal = useCallback((input: UpsertFinancialGoalInput) => {
+    const existingGoal = input.id
+      ? stateRef.current.financialGoals.find((goal) => goal.id === input.id) ?? null
+      : null
+
+    if (existingGoal?.status === 'archived') {
+      return 'Archived goals cannot be edited.'
+    }
+
+    const validationError = validateFinancialGoalInput({
+      name: input.name,
+      description: input.description,
+      type: input.type,
+      targetAmount: input.targetAmount,
+      currentAmount: input.currentAmount,
+      targetDate: input.targetDate,
+      priority: input.priority,
+    })
+
+    if (validationError) {
+      return validationError
+    }
+
+    const timestamp = new Date().toISOString()
+    const payload = {
+      id: existingGoal?.id ?? createId('goal'),
+      name: input.name.trim(),
+      description: input.description?.trim() ?? '',
+      type: input.type,
+      targetAmount: input.targetAmount,
+      currentAmount: input.currentAmount,
+      targetDate: input.targetDate,
+      priority: input.priority,
+      status: 'active' as const,
+      createdAt: existingGoal?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    }
+
+    dispatch({
+      type: existingGoal ? 'update-financial-goal' : 'add-financial-goal',
+      payload,
+    })
+
+    return null
+  }, [])
+
+  const archiveFinancialGoal = useCallback((goalId: string) => {
+    dispatch({
+      type: 'archive-financial-goal',
+      payload: {
+        id: goalId,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+  }, [])
+
   const setTheme = useCallback((theme: ThemeMode) => {
     dispatch({ type: 'update-settings', payload: { theme } })
   }, [])
@@ -934,6 +992,8 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       skipRecurringOccurrences,
       upsertBudget,
       removeBudget,
+      upsertFinancialGoal,
+      archiveFinancialGoal,
       setTheme,
       setCurrency,
       setHideSensitiveData,
@@ -977,6 +1037,8 @@ export function FinanceProvider({ children }: PropsWithChildren) {
       skipRecurringOccurrences,
       upsertBudget,
       removeBudget,
+      upsertFinancialGoal,
+      archiveFinancialGoal,
       setTheme,
       setCurrency,
       setHideSensitiveData,

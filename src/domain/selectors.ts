@@ -1,11 +1,18 @@
 import type {
   Budget,
   Category,
+  FinancialGoal,
   FinanceState,
   Transaction,
   TransactionType,
 } from './models'
 import { computeBudgetSpending, doesBudgetApplyToMonth } from './budget-service'
+import {
+  getFinancialGoalProgress,
+  getFinancialGoalProgressRatio,
+  getFinancialGoalRemainingAmount,
+  sortFinancialGoalsByPriorityAndUpdatedAt,
+} from './financial-goals'
 import { compareLocalDateKeys, getTodayLocalDate } from '../utils/date'
 
 export interface OverviewTotals {
@@ -66,6 +73,13 @@ export interface ComparisonOverview {
   current: OverviewTotals
   previous: OverviewTotals
   delta: OverviewTotals
+}
+
+export interface FinancialGoalSummary {
+  goal: FinancialGoal
+  progress: number
+  progressRatio: number
+  remainingAmount: number
 }
 
 function summarizeTransactions(transactions: Transaction[]): OverviewTotals {
@@ -420,5 +434,32 @@ export function getComparisonOverview(
       expense: current.expense - previous.expense,
     },
   }
+}
+
+export function getActiveFinancialGoals(state: FinanceState): FinancialGoal[] {
+  return sortFinancialGoalsByPriorityAndUpdatedAt(
+    state.financialGoals.filter((goal) => goal.status === 'active'),
+  )
+}
+
+export function getFinancialGoalSummaries(
+  goals: FinancialGoal[],
+): FinancialGoalSummary[] {
+  return goals.map((goal) => ({
+    goal,
+    progress: getFinancialGoalProgress(goal.currentAmount, goal.targetAmount),
+    progressRatio: getFinancialGoalProgressRatio(goal.currentAmount, goal.targetAmount),
+    remainingAmount: getFinancialGoalRemainingAmount(
+      goal.currentAmount,
+      goal.targetAmount,
+    ),
+  }))
+}
+
+export function getHomeFinancialGoalSummaries(
+  state: FinanceState,
+  limit = 3,
+): FinancialGoalSummary[] {
+  return getFinancialGoalSummaries(getActiveFinancialGoals(state).slice(0, limit))
 }
 

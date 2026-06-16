@@ -3,6 +3,7 @@ import type {
   AppSettings,
   Budget,
   Category,
+  FinancialGoal,
   FinanceState,
   RecurringTemplate,
   Transaction,
@@ -42,4 +43,7 @@ export type FinanceAction =
     }
   | { type: 'set-budget'; payload: Budget }
   | { type: 'remove-budget'; payload: { id: string } }
+  | { type: 'add-financial-goal'; payload: FinancialGoal }
+  | { type: 'update-financial-goal'; payload: FinancialGoal }
+  | { type: 'archive-financial-goal'; payload: { id: string; updatedAt: string } }
   | { type: 'update-settings'; payload: Partial<AppSettings> }

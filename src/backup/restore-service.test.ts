@@ -37,6 +37,21 @@ function createSampleState(): FinanceState {
         updatedAt: '2026-03-18T12:00:00.000Z',
       },
     ],
+    financialGoals: [
+      {
+        id: 'goal-emergency',
+        name: 'Emergency Fund',
+        description: '',
+        type: 'emergencyFund',
+        targetAmount: 10000,
+        currentAmount: 2500,
+        targetDate: null,
+        priority: 'high',
+        status: 'active',
+        createdAt: '2026-03-18T12:00:00.000Z',
+        updatedAt: '2026-03-18T12:00:00.000Z',
+      },
+    ],
     settings: {
       ...initialFinanceState.settings,
       hasSeenPrivacyModal: true,
@@ -62,6 +77,7 @@ describe('prepareBackupRestore', () => {
     expect(result.prepared.payload.exportedAt).toBe(exportedAt)
     expect(result.prepared.nextState.transactions).toHaveLength(1)
     expect(result.prepared.nextState.recurringTemplates).toHaveLength(1)
+    expect(result.prepared.nextState.financialGoals).toHaveLength(1)
     expect(result.prepared.nextState.settings.lastBackupAt).toBe(exportedAt)
     expect(result.prepared.nextState.settings.changesSinceBackup).toBe(0)
     expect(result.prepared.nextState.settings.lastReminderAt).toBeNull()
@@ -111,10 +127,10 @@ describe('prepareBackupRestore', () => {
     })
   })
 
-  it('rejects schema version 2 payloads that omit recurring templates', () => {
+  it('rejects schema version 3 payloads that omit recurring templates', () => {
     const result = prepareBackupRestore(
       JSON.stringify({
-        schemaVersion: 2,
+        schemaVersion: 3,
         exportedAt: '2026-03-19T09:30:00.000Z',
         app: 'Tally',
         data: {
@@ -133,6 +149,60 @@ describe('prepareBackupRestore', () => {
       ok: false,
       message: 'This backup file is not valid.',
     })
+  })
+
+  it('rejects schema version 3 payloads that omit financial goals', () => {
+    const result = prepareBackupRestore(
+      JSON.stringify({
+        schemaVersion: 3,
+        exportedAt: '2026-03-19T09:30:00.000Z',
+        app: 'Tally',
+        data: {
+          transactions: [],
+          categories: initialFinanceState.categories,
+          budgets: [],
+          recurringTemplates: [],
+          preferences: {
+            theme: 'dark',
+            currency: 'USD',
+          },
+        },
+      }),
+    )
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'This backup file is not valid.',
+    })
+  })
+
+  it('migrates schema version 2 backups by defaulting financial goals to empty', () => {
+    const result = prepareBackupRestore(
+      JSON.stringify({
+        schemaVersion: 2,
+        exportedAt: '2026-03-19T09:30:00.000Z',
+        app: 'Tally',
+        data: {
+          transactions: [],
+          categories: initialFinanceState.categories,
+          budgets: [],
+          recurringTemplates: [],
+          preferences: {
+            theme: 'dark',
+            currency: 'USD',
+          },
+        },
+      }),
+    )
+
+    expect(result.ok).toBe(true)
+
+    if (!result.ok) {
+      return
+    }
+
+    expect(result.prepared.payload.schemaVersion).toBe(3)
+    expect(result.prepared.nextState.financialGoals).toEqual([])
   })
 
   it('migrates schema version 1 backups by defaulting recurring templates to empty', () => {
@@ -170,8 +240,9 @@ describe('prepareBackupRestore', () => {
       return
     }
 
-    expect(result.prepared.payload.schemaVersion).toBe(2)
+    expect(result.prepared.payload.schemaVersion).toBe(3)
     expect(result.prepared.nextState.recurringTemplates).toHaveLength(0)
+    expect(result.prepared.nextState.financialGoals).toHaveLength(0)
     expect(result.prepared.nextState.transactions[0].recurringTemplateId).toBeNull()
   })
 
