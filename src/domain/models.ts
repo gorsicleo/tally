@@ -3,6 +3,15 @@ export type ThemeMode = 'dark' | 'light' | 'auto'
 export type CategoryKind = TransactionType | 'both'
 export type RecurringFrequency = 'monthly' | 'custom'
 export type CategorySystem = 'uncategorized' | null
+export type FinancialGoalType =
+  | 'house'
+  | 'car'
+  | 'emergencyFund'
+  | 'vacation'
+  | 'education'
+  | 'custom'
+export type FinancialGoalPriority = 'low' | 'medium' | 'high'
+export type FinancialGoalStatus = 'active' | 'archived'
 
 export interface AppLockPinVerifier {
   version: 1
@@ -89,6 +98,17 @@ export interface RecurringTemplate extends BaseEntity {
   active: boolean
 }
 
+export interface FinancialGoal extends BaseEntity {
+  name: string
+  description: string
+  type: FinancialGoalType
+  targetAmount: number
+  currentAmount: number
+  targetDate: string | null
+  priority: FinancialGoalPriority
+  status: FinancialGoalStatus
+}
+
 export interface AppSettings extends BackupPreferences {
   theme: ThemeMode
   currency: string
@@ -105,5 +125,6 @@ export interface FinanceState {
   transactions: Transaction[]
   budgets: Budget[]
   recurringTemplates: RecurringTemplate[]
+  financialGoals: FinancialGoal[]
   settings: AppSettings
 }

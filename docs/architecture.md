@@ -37,6 +37,8 @@ Feature UI lives in [src/features](../src/features). The app shell selects one a
 - Budgets: [src/features/budgets/budgets-screen.tsx](../src/features/budgets/budgets-screen.tsx)
 - Settings: [src/features/settings/settings-screen.tsx](../src/features/settings/settings-screen.tsx)
 
+Financial goals UX currently lives inside the Budgets tab as a segmented Budgets/Goals surface. Home includes a lightweight goals summary card that deep-links into Budgets -> Goals.
+
 UI components should stay focused on rendering, user interactions, and invoking context actions.
 
 ### State and Action Orchestration
@@ -84,6 +86,8 @@ Backup and restore are versioned and validated:
 
 Tally uses a single FinanceState object that contains categories, transactions, budgets, recurring templates, and settings.
 
+`FinanceState.financialGoals` is persisted with the rest of local finance data and follows the same hydrate/save lifecycle.
+
 Load/save lifecycle:
 
 1. Provider initializes reducer with default state.
@@ -117,12 +121,14 @@ Domain layer responsibilities:
 - Plan multi-entity category deletion impact.
 - Compute recurring due dates and processible sequences.
 - Produce totals and chart inputs for screens.
+- Validate financial goal inputs and derive progress/remaining values.
 
 UI layer responsibilities:
 
 - Collect user input and trigger context actions.
 - Display derived values and warnings/messages.
 - Present confirm flows for destructive actions and restore.
+- Provide goals create/edit/archive flows and Home discovery card navigation.
 
 Representative boundary examples:
 
@@ -150,6 +156,8 @@ Write flow:
 4. Throw only when both writes fail.
 
 This design prioritizes durability through dual-path writes and tolerant reads.
+
+Financial goals are included in both IndexedDB/localStorage persistence and backup/restore payloads (schema v3) with backward-compatible migration from older backup schemas.
 
 References:
 
@@ -245,6 +253,7 @@ References:
 Backup/restore invariants:
 
 - Unsupported backup schema versions are rejected.
+- Supported legacy schemas are normalized forward (v1/v2 -> v3), with missing `recurringTemplates` or `financialGoals` defaulted only where schema permits.
 - Restore path validates and normalizes data before applying.
 - Restore writes to persistence before reducer replacement to avoid in-memory-only restore state.
 

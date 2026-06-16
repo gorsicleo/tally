@@ -8,11 +8,20 @@ import type { Transaction } from '../../domain/models'
 
 interface AppScreenResolverProps {
   activeTab: AppTab
+  budgetsView: 'budgets' | 'goals'
+  openGoalCreateFromHome: boolean
   canInstall: boolean
   isInstalled: boolean
   onCreateBackup: () => Promise<boolean>
   onInstall: () => void
-  onNavigate: (tab: AppTab) => void
+  onNavigate: (
+    tab: AppTab,
+    options?: {
+      budgetsView?: 'budgets' | 'goals'
+      openCreateGoal?: boolean
+    },
+  ) => void
+  onGoalCreateRequestHandled: () => void
   onEditTransaction: (transaction: Transaction) => void
   onEditRecurring: (templateId: string) => void
   onShowToast: (message: string) => void
@@ -20,11 +29,14 @@ interface AppScreenResolverProps {
 
 export function AppScreenResolver({
   activeTab,
+  budgetsView,
+  openGoalCreateFromHome,
   canInstall,
   isInstalled,
   onCreateBackup,
   onInstall,
   onNavigate,
+  onGoalCreateRequestHandled,
   onEditTransaction,
   onEditRecurring,
   onShowToast,
@@ -38,7 +50,13 @@ export function AppScreenResolver({
   }
 
   if (activeTab === 'budgets') {
-    return <BudgetsScreen />
+    return (
+      <BudgetsScreen
+        initialView={budgetsView}
+        openCreateGoalRequest={openGoalCreateFromHome}
+        onOpenCreateGoalHandled={onGoalCreateRequestHandled}
+      />
+    )
   }
 
   if (activeTab === 'settings') {

@@ -2,6 +2,11 @@ import { isSystemCategory } from '../domain/categories'
 import type { Budget, FinanceState } from '../domain/models'
 import type { FinanceAction } from './finance-reducer-types'
 import {
+  isFinancialGoalPriority,
+  isFinancialGoalType,
+  validateFinancialGoalInput,
+} from '../domain/financial-goals'
+import {
   handleSetBudget,
   handleRemoveBudget,
 } from './reducer-cases/budgets'
@@ -301,6 +306,85 @@ export function financeReducer(
 
     case 'remove-budget': {
       return handleRemoveBudget(state, action)
+    }
+
+    case 'add-financial-goal': {
+      if (
+        action.payload.status !== 'active' ||
+        !isFinancialGoalType(action.payload.type) ||
+        !isFinancialGoalPriority(action.payload.priority) ||
+        validateFinancialGoalInput({
+          name: action.payload.name,
+          description: action.payload.description,
+          type: action.payload.type,
+          targetAmount: action.payload.targetAmount,
+          currentAmount: action.payload.currentAmount,
+          targetDate: action.payload.targetDate,
+          priority: action.payload.priority,
+        }) !== null
+      ) {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        financialGoals: [action.payload, ...state.financialGoals],
+      })
+    }
+
+    case 'update-financial-goal': {
+      const existingGoal = state.financialGoals.find(
+        (goal) => goal.id === action.payload.id,
+      )
+
+      if (
+        !existingGoal ||
+        existingGoal.status !== 'active' ||
+        action.payload.status !== 'active' ||
+        !isFinancialGoalType(action.payload.type) ||
+        !isFinancialGoalPriority(action.payload.priority) ||
+        validateFinancialGoalInput({
+          name: action.payload.name,
+          description: action.payload.description,
+          type: action.payload.type,
+          targetAmount: action.payload.targetAmount,
+          currentAmount: action.payload.currentAmount,
+          targetDate: action.payload.targetDate,
+          priority: action.payload.priority,
+        }) !== null
+      ) {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        financialGoals: state.financialGoals.map((goal) =>
+          goal.id === action.payload.id ? action.payload : goal,
+        ),
+      })
+    }
+
+    case 'archive-financial-goal': {
+      const existingGoal = state.financialGoals.find(
+        (goal) => goal.id === action.payload.id,
+      )
+
+      if (!existingGoal || existingGoal.status !== 'active') {
+        return state
+      }
+
+      return recordMeaningfulChange({
+        ...state,
+        financialGoals: state.financialGoals.map((goal) =>
+          goal.id === action.payload.id
+            ? {
+                ...goal,
+                status: 'archived',
+                updatedAt: action.payload.updatedAt,
+              }
+            : goal,
+        ),
+      })
     }
 
     case 'update-settings':

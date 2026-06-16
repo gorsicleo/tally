@@ -85,6 +85,7 @@ export const initialFinanceState: FinanceState = {
   transactions: [],
   budgets: [],
   recurringTemplates: [],
+  financialGoals: [],
   settings: {
     theme: 'dark',
     currency: 'USD',

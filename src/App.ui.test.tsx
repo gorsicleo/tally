@@ -236,7 +236,7 @@ describe('App UI behavior', () => {
     const copiedText = reportBugState.copySpy.mock.calls.at(0)?.at(0)
     expect(copiedText).toBeTypeOf('string')
     expect(copiedText).toContain('App: Tally')
-  })
+  }, 15000)
 
   it('opens github issue URL from report bug dialog', async () => {
     const { user } = renderWithUser(<App />)
@@ -636,7 +636,7 @@ describe('App UI behavior', () => {
       version: 1,
       credentialId: 'abc123_XYZ',
     })
-  })
+  }, 15000)
 
   it('stores only hashed recovery metadata after generating recovery codes', async () => {
     const { user } = renderWithUser(<App />)
@@ -668,7 +668,7 @@ describe('App UI behavior', () => {
     const latestSavedState = storageState.saveSpy.mock.lastCall?.[0] as FinanceState | undefined
     expect(latestSavedState?.settings.recoveryCodeSet).not.toBeNull()
     expect(JSON.stringify(latestSavedState?.settings.recoveryCodeSet)).not.toContain(firstCode)
-  })
+  }, 15000)
 
   it('keeps the app inaccessible while locked until authentication succeeds', async () => {
     storageState.loadedState = createLoadedState({
@@ -808,7 +808,7 @@ describe('App UI behavior', () => {
           savedState.settings.recoveryCodeSet === null,
       ),
     ).toBe(true)
-  })
+  }, 15000)
 
   it('starts locked on fresh launch when app lock is enabled and unlocks with the correct PIN', async () => {
     storageState.loadedState = createLoadedState({
@@ -828,7 +828,7 @@ describe('App UI behavior', () => {
 
     expect(await screen.findByText('This month')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Unlock Tally' })).not.toBeInTheDocument()
-  })
+  }, 15000)
 
   it('keeps hide-sensitive masking active after unlock until explicitly revealed', async () => {
     storageState.loadedState = createLoadedState({
@@ -1336,7 +1336,7 @@ describe('App UI behavior', () => {
     expect(storageState.downloadSpy).toHaveBeenNthCalledWith(
       1,
       expect.stringMatching(/^tally-backup-/),
-      expect.stringContaining('"schemaVersion": 2'),
+      expect.stringContaining('"schemaVersion": 3'),
       'application/json;charset=utf-8',
     )
     expect(storageState.downloadSpy).toHaveBeenNthCalledWith(

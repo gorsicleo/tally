@@ -57,6 +57,8 @@ function FinanceWorkspace() {
   } = useFinance()
   const { canInstall, install, isInstalled } = useInstallPrompt()
   const [activeTab, setActiveTab] = useState<AppTab>('home')
+  const [budgetsView, setBudgetsView] = useState<'budgets' | 'goals'>('budgets')
+  const [openGoalCreateFromHome, setOpenGoalCreateFromHome] = useState(false)
   const {
     editorTransactionId,
     editingTransaction,
@@ -84,7 +86,18 @@ function FinanceWorkspace() {
     [state.settings.lastBackupAt],
   )
 
-  const handleTabChange = (tab: AppTab) => {
+  const handleTabChange = (
+    tab: AppTab,
+    options?: {
+      budgetsView?: 'budgets' | 'goals'
+      openCreateGoal?: boolean
+    },
+  ) => {
+    if (tab === 'budgets') {
+      setBudgetsView(options?.budgetsView ?? 'budgets')
+      setOpenGoalCreateFromHome(Boolean(options?.openCreateGoal))
+    }
+
     setActiveTab(tab)
   }
 
@@ -329,6 +342,8 @@ function FinanceWorkspace() {
         {isLoaded ? (
           <AppScreenResolver
             activeTab={activeTab}
+            budgetsView={budgetsView}
+            openGoalCreateFromHome={openGoalCreateFromHome}
             canInstall={canInstall}
             isInstalled={isInstalled}
             onCreateBackup={() => createBackup()}
@@ -336,6 +351,9 @@ function FinanceWorkspace() {
               void install()
             }}
             onNavigate={handleTabChange}
+            onGoalCreateRequestHandled={() => {
+              setOpenGoalCreateFromHome(false)
+            }}
             onEditTransaction={openTransactionEditor}
             onEditRecurring={openRecurringEditor}
             onShowToast={showToast}

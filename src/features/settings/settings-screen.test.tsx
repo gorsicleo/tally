@@ -769,7 +769,7 @@ describe('SettingsScreen direct flows', () => {
       ok: true as const,
       prepared: {
         payload: {
-          schemaVersion: 2,
+          schemaVersion: 3,
           exportedAt: '2026-03-20T10:00:00.000Z',
           app: 'Tally',
           data: {
@@ -777,6 +777,7 @@ describe('SettingsScreen direct flows', () => {
             categories: nextState.categories,
             budgets: nextState.budgets,
             recurringTemplates: nextState.recurringTemplates,
+            financialGoals: nextState.financialGoals,
             preferences: nextState.settings,
           },
         },
@@ -806,7 +807,7 @@ describe('SettingsScreen direct flows', () => {
       ok: true as const,
       prepared: {
         payload: {
-          schemaVersion: 2,
+          schemaVersion: 3,
           exportedAt: '2026-03-20T10:00:00.000Z',
           app: 'Tally',
           data: {
@@ -814,6 +815,7 @@ describe('SettingsScreen direct flows', () => {
             categories: initialFinanceState.categories,
             budgets: [],
             recurringTemplates: [],
+            financialGoals: [],
             preferences: initialFinanceState.settings,
           },
         },

@@ -62,6 +62,21 @@ function createSampleState(): FinanceState {
         updatedAt: '2026-03-01T09:00:00.000Z',
       },
     ],
+    financialGoals: [
+      {
+        id: 'goal-house',
+        name: 'House',
+        description: 'Down payment',
+        type: 'house',
+        targetAmount: 100000,
+        currentAmount: 5000,
+        targetDate: '2027-01-01',
+        priority: 'high',
+        status: 'active',
+        createdAt: '2026-03-01T09:00:00.000Z',
+        updatedAt: '2026-03-01T09:00:00.000Z',
+      },
+    ],
     settings: {
       ...initialFinanceState.settings,
       currency: 'EUR',
@@ -79,13 +94,14 @@ describe('buildBackupPayload', () => {
     const exportedAt = '2026-03-19T09:30:00.000Z'
     const payload = buildBackupPayload(createSampleState(), exportedAt)
 
-    expect(payload.schemaVersion).toBe(2)
+    expect(payload.schemaVersion).toBe(3)
     expect(payload.app).toBe('Tally')
     expect(payload.exportedAt).toBe(exportedAt)
     expect(payload.data.transactions).toHaveLength(1)
     expect(payload.data.categories).toHaveLength(initialFinanceState.categories.length + 1)
     expect(payload.data.budgets).toHaveLength(1)
     expect(payload.data.recurringTemplates).toHaveLength(1)
+    expect(payload.data.financialGoals).toHaveLength(1)
     expect(payload.data.preferences.currency).toBe('EUR')
     expect(payload.data.preferences.backupRemindersEnabled).toBe(false)
     expect(payload.data.preferences.lastBackupAt).toBe(exportedAt)

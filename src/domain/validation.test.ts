@@ -51,8 +51,78 @@ describe('parsePersistedFinanceState', () => {
     expect(parsedState?.settings.deviceAuthCredential).toBeNull()
     expect(parsedState?.settings.recoveryCodeSet).toBeNull()
     expect(parsedState?.recurringTemplates).toEqual([])
+    expect(parsedState?.financialGoals).toEqual([])
     expect(parsedState?.transactions[0].recurringTemplateId).toBeNull()
     expect(parsedState?.transactions[0].recurringOccurrenceDate).toBeNull()
+  })
+
+  it('parses persisted financial goals and keeps archived status', () => {
+    const state = {
+      categories: [
+        {
+          id: 'cat-food',
+          name: 'Food',
+          color: '#ff8b5f',
+          kind: 'expense',
+          system: null,
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      transactions: [],
+      budgets: [],
+      recurringTemplates: [],
+      financialGoals: [
+        {
+          id: 'goal-1',
+          name: 'House',
+          description: 'Down payment',
+          type: 'house',
+          targetAmount: 100000,
+          currentAmount: 1000,
+          targetDate: '2027-01-01',
+          priority: 'high',
+          status: 'active',
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+        {
+          id: 'goal-2',
+          name: 'Old',
+          description: '',
+          type: 'custom',
+          targetAmount: 1000,
+          currentAmount: 1000,
+          targetDate: null,
+          priority: 'low',
+          status: 'archived',
+          createdAt: '2026-03-01T10:00:00.000Z',
+          updatedAt: '2026-03-01T10:00:00.000Z',
+        },
+      ],
+      settings: {
+        theme: 'dark',
+        currency: 'USD',
+        hasSeenPrivacyModal: true,
+        backupRemindersEnabled: true,
+        lastBackupAt: null,
+        backupReminderBaselineAt: null,
+        changesSinceBackup: 0,
+        lastReminderAt: null,
+        hideOverspendingBudgetsInHome: false,
+        hideSensitiveData: false,
+        lockAppOnLaunch: false,
+        appLockPinVerifier: null,
+        deviceAuthCredential: null,
+        recoveryCodeSet: null,
+      },
+    }
+
+    const parsedState = parsePersistedFinanceState(state)
+
+    expect(parsedState).not.toBeNull()
+    expect(parsedState?.financialGoals).toHaveLength(2)
+    expect(parsedState?.financialGoals[1].status).toBe('archived')
   })
 
   it('normalizes lock-on-launch off when persisted state has no verifier', () => {
